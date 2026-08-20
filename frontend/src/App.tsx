@@ -42,47 +42,6 @@ export default function App() {
     return <LoginPage />
   }
 
-  if (session.status === 'blocked') {
-    return (
-      <>
-        <LoginPage />
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-6">
-          <div className="glass max-w-md w-full p-8 text-center space-y-4 border border-rose-400/30">
-            <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-2xl">
-              🚫
-            </div>
-            <h1 className="text-2xl font-bold">Login not allowed</h1>
-            <p className="text-slate-300 text-sm leading-relaxed">{session.reason}</p>
-            <p className="text-xs text-slate-500">
-              This is an MVP running on a minimum budget. Only one login is allowed per account.
-            </p>
-            <button
-              className="btn-primary w-full"
-              onClick={() => instance.logoutRedirect({ postLogoutRedirectUri: window.location.origin })}
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </>
-    )
-  }
-
-  if (session.status === 'expired') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="glass max-w-md w-full p-8 text-center space-y-4">
-          <h1 className="text-2xl font-bold">Session ended</h1>
-          <p className="text-slate-300 text-sm">Your 2-minute session has expired. Signing you out…</p>
-        </div>
-      </div>
-    )
-  }
-
-  const sessionActive = session.status === 'active'
-  const isUnlimited = sessionActive && session.isUnlimited
-  const remaining = sessionActive ? session.remaining : 0
-
   const tabs: { id: Stage; label: string; icon: any }[] = [
     { id: 'topics', label: 'What to learn', icon: GraduationCap },
     { id: 'chat', label: 'Refine focus', icon: MessageSquare },
@@ -104,24 +63,6 @@ export default function App() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {sessionActive && !isUnlimited && (
-              <span
-                className={`hidden sm:inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border ${
-                  remaining <= 30
-                    ? 'bg-rose-500/15 border-rose-400/40 text-rose-300'
-                    : 'bg-white/5 border-white/10 text-slate-300'
-                }`}
-                title="MVP session — you'll be signed out after this timer"
-              >
-                <Clock className="w-3 h-3" />
-                {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
-              </span>
-            )}
-            {isUnlimited && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300">
-                unlimited
-              </span>
-            )}
             <AuthGate />
           </div>
         </div>
