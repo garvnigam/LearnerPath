@@ -15,3 +15,5 @@ frontend/.env
 *.pyc
 .vscode/
 .idea/
+learnerpath-api.PublishSettings
+*.PublishSettings
