@@ -87,16 +87,79 @@ class StartResult:
 
 
 def start_session(user: Principal, request: Request) -> StartResult:
-    # MVP: quotas fully disabled for now. Everyone gets an unlimited session.
+    if settings.entra_auth_disabled:
+        return StartResult(True, None, True, settings.session_ttl_seconds,
+                           time.time() + settings.session_ttl_seconds)
+
+    subject, email = _identify(user)
+
+    # Hard admin bypass: unlimited, no ledger, no IP check, no TTL.
+    if _is_unlimited(email):
+        return StartResult(
+            allowed=True,
+            reason=None,
+            is_unlimited=True,
+            ttl_seconds=settings.session_ttl_seconds,
+            session_expires_at=time.time() + settings.session_ttl_seconds,
+        )
+
+    ip = _client_ip(request)
+    ip_exempt = ip in _ip_allowlist()
+
+    already_subject = subject in _LOGIN_LEDGER
+    ip_owner = _IP_LEDGER.get(ip)
+
+    if not ip_exempt and settings.single_login_enforced:
+        if already_subject:
+            return StartResult(
+                allowed=False,
+                reason="This account has already been used. Only one login per user is allowed in this MVP.",
+                is_unlimited=False,
+                ttl_seconds=settings.session_ttl_seconds,
+                session_expires_at=0.0,
+            )
+        if ip_owner and ip_owner != subject:
+            return StartResult(
+                allowed=False,
+                reason="This device / network has already been used to sign in. Only one account per network is allowed in this MVP.",
+                is_unlimited=False,
+                ttl_seconds=settings.session_ttl_seconds,
+                session_expires_at=0.0,
+            )
+
+    if not already_subject:
+        _LOGIN_LEDGER[subject] = {"email": email, "first_seen_at": time.time(), "ip": ip}
+    if not ip_exempt and ip_owner is None:
+        _IP_LEDGER[ip] = subject
+
+    now = time.time()
+    _SESSION_STARTS[subject] = now
     return StartResult(
         allowed=True,
         reason=None,
-        is_unlimited=True,
+        is_unlimited=ip_exempt,
         ttl_seconds=settings.session_ttl_seconds,
-        session_expires_at=time.time() + settings.session_ttl_seconds,
+        session_expires_at=now + settings.session_ttl_seconds,
     )
 
 
 def enforce_active_session(request: Request, user: Principal = Depends(require_user)) -> Principal:
-    # MVP: session TTL disabled for now.
+    """Reject requests once the per-session TTL has elapsed (unless unlimited)."""
+    if settings.entra_auth_disabled:
+        return user
+
+    _, email = _identify(user)
+    if _is_unlimited(email):
+        return user
+    if _client_ip(request) in _ip_allowlist():
+        return user
+
+    subject = user.subject or email or "anonymous"
+    started = _SESSION_STARTS.get(subject)
+    if started is None:
+        _SESSION_STARTS[subject] = time.time()
+        return user
+
+    if time.time() - started > settings.session_ttl_seconds:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "session_expired")
     return user

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useIsAuthenticated } from '@azure/msal-react'
+import { useMsal, useIsAuthenticated } from '@azure/msal-react'
 import { apiPost } from './api'
 import { entraConfigured } from './authConfig'
 
@@ -19,6 +19,7 @@ type StartResp = {
 }
 
 export function useSessionQuota() {
+  const { instance } = useMsal()
   const isAuthenticated = useIsAuthenticated()
   const [state, setState] = useState<SessionState>({ status: 'idle' })
 
@@ -26,26 +27,49 @@ export function useSessionQuota() {
     if (!entraConfigured || !isAuthenticated) return
     let cancelled = false
     setState({ status: 'checking' })
-    // Fire-and-forget: quotas are disabled for MVP, but we still call
-    // /session/start so backend logs the event. Any outcome -> unlimited.
     ;(async () => {
       try {
-        await apiPost<StartResp>('/api/session/start', {})
-      } catch {
-        // ignore — quotas disabled on client side too
+        const r = await apiPost<StartResp>('/api/session/start', {})
+        if (cancelled) return
+        const expiresAtMs = r.session_expires_at * 1000
+        setState({
+          status: 'active',
+          expiresAt: expiresAtMs,
+          isUnlimited: r.is_unlimited,
+          remaining: Math.max(0, Math.floor((expiresAtMs - Date.now()) / 1000)),
+        })
+      } catch (e: any) {
+        if (cancelled) return
+        const msg = String(e?.message || '')
+        if (msg.startsWith('403')) {
+          const reason = msg.replace(/^403:\s*/, '').replace(/^"|"$/g, '')
+          setState({ status: 'blocked', reason: reason || 'Login not allowed.' })
+        } else {
+          setState({ status: 'network_error', message: msg || 'Could not reach the backend.' })
+        }
       }
-      if (cancelled) return
-      setState({
-        status: 'active',
-        expiresAt: Number.POSITIVE_INFINITY,
-        isUnlimited: true,
-        remaining: 0,
-      })
     })()
     return () => {
       cancelled = true
     }
   }, [isAuthenticated])
+
+  useEffect(() => {
+    if (state.status !== 'active' || state.isUnlimited) return
+    const tick = () => {
+      const remaining = Math.max(0, Math.floor((state.expiresAt - Date.now()) / 1000))
+      if (remaining <= 0) {
+        setState({ status: 'expired' })
+        instance.logoutRedirect({ postLogoutRedirectUri: window.location.origin }).catch(() => {})
+        return
+      }
+      setState({ ...state, remaining })
+    }
+    tick()
+    const id = window.setInterval(tick, 1000)
+    return () => window.clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.status, (state as any).expiresAt, (state as any).isUnlimited])
 
   return state
 }
