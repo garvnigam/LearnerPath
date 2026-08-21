@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import type { TopicInput } from '../lib/types'
-import { Rocket } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { FormatPref, GoalType, PacePref, SavedPlanResponse, TopicInput } from '../lib/types'
+import { Rocket, History, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { apiGet } from '../lib/api'
 
 const SUGGESTED = [
   'Computer Science', 'Machine Learning', 'Deep Learning', 'Data Science',
@@ -10,15 +11,57 @@ const SUGGESTED = [
   'Music', 'Arts', 'History', 'Philosophy', 'Psychology', 'Biology',
 ]
 
-export default function TabTopics({ onSubmit }: { onSubmit: (t: TopicInput) => void }) {
+const GOALS: { id: GoalType; label: string }[] = [
+  { id: 'job', label: 'Get a job' },
+  { id: 'certification', label: 'Certification' },
+  { id: 'project', label: 'Build a project' },
+  { id: 'curiosity', label: 'Curiosity' },
+  { id: 'exam_prep', label: 'Exam prep' },
+]
+
+const FORMATS: { id: FormatPref; label: string }[] = [
+  { id: 'video', label: 'Video' },
+  { id: 'text', label: 'Text' },
+  { id: 'hands-on', label: 'Hands-on' },
+]
+
+const PACES: { id: PacePref; label: string }[] = [
+  { id: 'solo', label: 'Solo' },
+  { id: 'cohort', label: 'Cohort' },
+  { id: 'paced', label: 'Paced w/ deadlines' },
+]
+
+export default function TabTopics({
+  userId,
+  onSubmit,
+  onResume,
+}: {
+  userId: string | null
+  onSubmit: (t: TopicInput) => void
+  onResume: (plan: SavedPlanResponse) => void
+}) {
   const [selected, setSelected] = useState<string[]>([])
   const [custom, setCustom] = useState('')
   const [months, setMonths] = useState(6)
   const [hours, setHours] = useState(2)
-  const [goal, setGoal] = useState('')
+  const [goal, setGoal] = useState<GoalType | undefined>(undefined)
+  const [formats, setFormats] = useState<FormatPref[]>([])
+  const [pace, setPace] = useState<PacePref | undefined>(undefined)
+
+  const [resuming, setResuming] = useState(false)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const [hasSavedPlan, setHasSavedPlan] = useState(false)
+
+  useEffect(() => {
+    setHasSavedPlan(false)
+  }, [userId])
 
   function toggle(s: string) {
     setSelected((cur) => cur.includes(s) ? cur.filter((x) => x !== s) : [...cur, s])
+  }
+
+  function toggleFormat(f: FormatPref) {
+    setFormats((cur) => cur.includes(f) ? cur.filter((x) => x !== f) : [...cur, f])
   }
 
   function addCustom() {
@@ -27,10 +70,39 @@ export default function TabTopics({ onSubmit }: { onSubmit: (t: TopicInput) => v
     setCustom('')
   }
 
+  async function continueSaved() {
+    if (!userId) return
+    setResuming(true)
+    setResumeError(null)
+    try {
+      const plan = await apiGet<SavedPlanResponse>(`/api/plan/${userId}`)
+      onResume(plan)
+    } catch (e: any) {
+      setResumeError('No saved plan found, or it could not be loaded.')
+    } finally {
+      setResuming(false)
+    }
+  }
+
   const valid = selected.length > 0 && months > 0 && hours > 0
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      {userId && (
+        <div className="glass p-4 flex items-center justify-between gap-4">
+          <div className="text-sm text-slate-300">
+            Already have a plan? Pick up right where you left off.
+          </div>
+          <div className="flex items-center gap-2">
+            {resumeError && <span className="text-xs text-rose-400">{resumeError}</span>}
+            <button className="btn-ghost flex items-center gap-2" onClick={continueSaved} disabled={resuming}>
+              {resuming ? <Loader2 className="w-4 h-4 animate-spin" /> : <History className="w-4 h-4" />}
+              Continue my plan
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="glass p-8">
         <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
           What do you want to learn?
@@ -116,14 +188,55 @@ export default function TabTopics({ onSubmit }: { onSubmit: (t: TopicInput) => v
 
       <div className="glass p-6">
         <label className="block text-sm font-medium text-slate-300 mb-2">
-          What's your goal? <span className="text-slate-500 font-normal">(optional)</span>
+          What's your goal?
         </label>
-        <textarea
-          className="input min-h-[80px] resize-none"
-          placeholder="e.g. Get an ML engineer job in 6 months, or just curious about deep learning"
-          value={goal}
-          onChange={(e) => setGoal(e.target.value)}
-        />
+        <div className="flex flex-wrap gap-2">
+          {GOALS.map((g) => (
+            <button
+              key={g.id}
+              className={`chip ${goal === g.id ? 'chip-active' : ''}`}
+              onClick={() => setGoal((cur) => (cur === g.id ? undefined : g.id))}
+            >
+              {g.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <div className="glass p-6">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Prefer video, text, or hands-on? <span className="text-slate-500 font-normal">(pick any)</span>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {FORMATS.map((f) => (
+              <button
+                key={f.id}
+                className={`chip ${formats.includes(f.id) ? 'chip-active' : ''}`}
+                onClick={() => toggleFormat(f.id)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="glass p-6">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
+            Solo, cohort, or paced with deadlines?
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {PACES.map((p) => (
+              <button
+                key={p.id}
+                className={`chip ${pace === p.id ? 'chip-active' : ''}`}
+                onClick={() => setPace((cur) => (cur === p.id ? undefined : p.id))}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="flex justify-end">
@@ -135,7 +248,9 @@ export default function TabTopics({ onSubmit }: { onSubmit: (t: TopicInput) => v
               subjects: selected,
               duration_months: months,
               hours_per_day: hours,
-              goal: goal || undefined,
+              goal,
+              preferred_formats: formats,
+              pace,
             })
           }
         >

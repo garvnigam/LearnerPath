@@ -33,3 +33,26 @@ def save_session(user_id: str | None, session_id: str, payload: dict) -> None:
         }, on_conflict="session_id").execute()
     except Exception as e:
         print(f"[supabase] save_session failed: {e}")
+
+
+def get_latest_recommendation(user_id: str) -> dict | None:
+    sb = get_supabase()
+    if not sb:
+        return None
+    try:
+        res = (
+            sb.table("learning_sessions")
+            .select("session_id, data, updated_at")
+            .eq("user_id", user_id)
+            .order("updated_at", desc=True)
+            .limit(20)
+            .execute()
+        )
+        for row in res.data or []:
+            data = row.get("data") or {}
+            if data.get("stage") == "recommendation":
+                return {"session_id": row["session_id"], **data}
+        return None
+    except Exception as e:
+        print(f"[supabase] get_latest_recommendation failed: {e}")
+        return None

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { MCQ, RecommendationResponse, TopicInput } from '../lib/types'
 import { apiPost } from '../lib/api'
-import { Loader2, CheckCircle2 } from 'lucide-react'
+import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 type Props = {
@@ -19,15 +19,17 @@ type Props = {
 export default function TabAssessment({
   userId, sessionId, topicInput, focusAreas, questions, setQuestions, answers, setAnswers, onSubmit,
 }: Props) {
+  const [round, setRound] = useState<1 | 2>(1)
   const [loading, setLoading] = useState(false)
+  const [advancing, setAdvancing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (questions.length === 0) {
       setLoading(true)
-      apiPost<{ questions: MCQ[] }>('/api/assessment', {
-        session_id: sessionId, topic_input: topicInput, focus_areas: focusAreas,
+      apiPost<{ questions: MCQ[]; round: number }>('/api/assessment', {
+        session_id: sessionId, topic_input: topicInput, focus_areas: focusAreas, round: 1,
       })
         .then((r) => setQuestions(r.questions))
         .catch((e) => setError(e.message))
@@ -36,8 +38,33 @@ export default function TabAssessment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const roundOneQuestions = questions.slice(0, 5)
+  const roundTwoQuestions = questions.slice(5, 10)
+  const visibleQuestions = round === 1 ? roundOneQuestions : questions
+
   const answered = Object.keys(answers).length
-  const canSubmit = answered === questions.length && questions.length > 0
+  const roundOneAnswered = roundOneQuestions.filter((q) => answers[q.id]).length
+  const canAdvance = round === 1 && roundOneAnswered === roundOneQuestions.length && roundOneQuestions.length === 5
+  const canSubmit = round === 2 && answered === questions.length && questions.length === 10
+
+  async function advanceToRound2() {
+    setAdvancing(true)
+    setError(null)
+    try {
+      const priorAnswers: Record<number, 'A' | 'B' | 'C' | 'D'> = {}
+      for (const q of roundOneQuestions) priorAnswers[q.id] = answers[q.id]
+      const r = await apiPost<{ questions: MCQ[]; round: number }>('/api/assessment', {
+        session_id: sessionId, topic_input: topicInput, focus_areas: focusAreas,
+        round: 2, prior_questions: roundOneQuestions, prior_answers: priorAnswers,
+      })
+      setQuestions([...roundOneQuestions, ...r.questions])
+      setRound(2)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setAdvancing(false)
+    }
+  }
 
   async function submit() {
     setSubmitting(true)
@@ -75,22 +102,33 @@ export default function TabAssessment({
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
       <div className="glass p-6 flex items-center justify-between sticky top-24 z-10 backdrop-blur-xl">
         <div>
-          <h2 className="text-lg font-semibold">10-question assessment</h2>
-          <p className="text-sm text-slate-400">Answer all to unlock your personalized path.</p>
+          <h2 className="text-lg font-semibold">Adaptive quiz — round {round} of 2</h2>
+          <p className="text-sm text-slate-400">
+            {round === 1
+              ? 'Answer these 5 to help us find your level.'
+              : 'These 5 are targeted at your boundary — answer to lock in your path.'}
+          </p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <div className="text-2xl font-bold">{answered}<span className="text-slate-500">/{questions.length}</span></div>
+            <div className="text-2xl font-bold">
+              {round === 1 ? roundOneAnswered : answered}
+              <span className="text-slate-500">/{round === 1 ? 5 : questions.length}</span>
+            </div>
             <div className="text-xs text-slate-400">answered</div>
           </div>
           <div className="w-32 h-2 rounded-full bg-white/10 overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
-                 style={{ width: `${(answered / Math.max(1, questions.length)) * 100}%` }} />
+            <div
+              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
+              style={{
+                width: `${((round === 1 ? roundOneAnswered : answered) / (round === 1 ? 5 : Math.max(1, questions.length))) * 100}%`,
+              }}
+            />
           </div>
         </div>
       </div>
 
-      {questions.map((q, i) => (
+      {visibleQuestions.map((q, i) => (
         <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="glass p-6">
           <div className="flex items-start gap-3 mb-4">
             <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold flex-shrink-0">
@@ -98,9 +136,16 @@ export default function TabAssessment({
             </span>
             <div className="flex-1">
               <p className="font-medium leading-relaxed">{q.question}</p>
-              <span className="inline-block mt-2 text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-400">
-                {q.difficulty}
-              </span>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-slate-400">
+                  {q.difficulty}
+                </span>
+                {q.subject && (
+                  <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300">
+                    {q.subject}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -129,9 +174,15 @@ export default function TabAssessment({
       ))}
 
       <div className="flex justify-end sticky bottom-4">
-        <button className="btn-primary" disabled={!canSubmit || submitting} onClick={submit}>
-          {submitting ? (<><Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Analyzing…</>) : 'Submit & get my path'}
-        </button>
+        {round === 1 ? (
+          <button className="btn-primary flex items-center gap-2" disabled={!canAdvance || advancing} onClick={advanceToRound2}>
+            {advancing ? (<><Loader2 className="w-4 h-4 animate-spin" /> Tuning next questions…</>) : (<>Next 5 questions <ArrowRight className="w-4 h-4" /></>)}
+          </button>
+        ) : (
+          <button className="btn-primary" disabled={!canSubmit || submitting} onClick={submit}>
+            {submitting ? (<><Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Analyzing…</>) : 'Submit & get my path'}
+          </button>
+        )}
       </div>
     </motion.div>
   )

@@ -19,14 +19,17 @@ Return STRICT JSON:
 }
 """
 
-ASSESSMENT_SYSTEM = """You are an expert assessment designer.
-Generate EXACTLY 10 multiple-choice questions to determine if the learner is beginner, intermediate, or advanced in their focus areas.
+ASSESSMENT_SYSTEM = """You are an expert assessment designer building an adaptive (CAT-lite) quiz.
+Generate EXACTLY 5 multiple-choice questions per call.
 
 Rules:
-- Mix difficulties: ~3 beginner, ~4 intermediate, ~3 advanced.
+- Every question MUST be tagged with a "subject" field naming exactly one of the learner's chosen subjects (use the subject strings given, verbatim).
+- Spread the 5 questions across the learner's subjects as evenly as possible.
+- If this is ROUND 1 (no prior performance given): mix difficulties roughly evenly (beginner/intermediate/advanced) per subject to probe a wide range.
+- If this is ROUND 2 (prior round performance given per subject): target each subject's questions at the DIFFICULTY BOUNDARY implied by that subject's round-1 accuracy — e.g. if the learner got round-1 questions in a subject mostly right, weight round-2 questions in that subject toward intermediate/advanced to pinpoint their ceiling; if mostly wrong, weight toward beginner/intermediate to pinpoint their floor. Do not simply repeat round 1's difficulty mix.
 - 4 options (A-D), exactly one correct, plausible distractors.
 - Questions must be answerable without external context (self-contained).
-- Cover the focus areas broadly; don't repeat concepts.
+- Don't repeat concepts already covered in prior questions (if given).
 - Short explanation for the correct answer.
 
 Return STRICT JSON:
@@ -34,6 +37,7 @@ Return STRICT JSON:
   "questions": [
     {
       "id": 1,
+      "subject": "<one of the learner's subjects, verbatim>",
       "question": "...",
       "options": [
         {"key":"A","text":"..."},
@@ -45,13 +49,13 @@ Return STRICT JSON:
       "explanation": "...",
       "difficulty": "beginner|intermediate|advanced"
     },
-    ... 10 total
+    ... 5 total
   ]
 }
 """
 
 RECOMMEND_SYSTEM = """You are a personalized learning-path designer.
-Given the learner's profile, quiz results, and a list of free courses from MIT/Stanford/IIT/Harvard/etc.,
+Given the learner's profile, per-subject quiz results, and a list of free courses from MIT/Stanford/IIT/Harvard/etc.,
 produce a curated study plan.
 
 Rules:
@@ -62,16 +66,44 @@ Rules:
   regulator materials like ICAI for CA, etc.) — ONLY if they are genuinely world-class and you are
   confident the URL is stable and correct. Do not fabricate URLs or invent courses that don't exist.
   If unsure, don't add extras.
-- 4-8 total resources, ordered foundational -> advanced given the learner's level and time budget.
-- Write a compact weekly_plan string (2-4 sentences) fitting duration_months and hours_per_day.
-- Identify concrete strengths and gaps from the quiz mistakes.
+- Pick courses at the depth appropriate to EACH subject's own level (a learner can be advanced in one
+  subject and beginner in another) — do not use a single blended level to choose every course.
+- Weight the plan toward the learner's stated goal:
+  - "job": favor project-heavy, portfolio-building, industry-relevant resources.
+  - "certification": include at least one resource with practice tests / exam-style material.
+  - "project": favor hands-on, build-along resources (labs, repos, project-based courses).
+  - "curiosity": favor engaging, conceptual, broad-survey resources over exam prep.
+  - "exam_prep": favor resources with practice questions and structured syllabi.
+- Respect the learner's preferred formats (video/text/hands-on) and pace (solo/cohort/paced) when choosing
+  and describing resources — prefer candidates whose "format" matches, when quality is comparable.
+- 4-8 total resources, ordered foundational -> advanced given each subject's level and the time budget.
+- Produce a week-by-week plan as a "weekly_plan" array covering the full duration_months at a reasonable
+  granularity (one entry per week, or per block of weeks if duration is long — cap at 12 entries for very
+  long durations by grouping weeks). Each entry needs:
+  "week" (int, sequential), "focus" (what the learner should concentrate on that week/block),
+  "primary_resource" (title of the main resource for that week, matching one of the chosen courses),
+  "secondary_resource" (optional supplementary resource title, or null),
+  "checkpoint" (a concrete way to confirm progress: a 3-question mini self-check or a small project/task).
+- Identify concrete strengths and gaps from the quiz mistakes, per subject where relevant.
+- Report "level_by_subject": a level (beginner|intermediate|advanced) for EACH subject given in the
+  learner's profile, plus an overall "level" that is the learner's most representative/typical level
+  across subjects.
 
 Return STRICT JSON:
 {
   "level": "beginner|intermediate|advanced",
+  "level_by_subject": {"<subject>": "beginner|intermediate|advanced", ...},
   "strengths": ["..."],
   "gaps": ["..."],
-  "weekly_plan": "...",
+  "weekly_plan": [
+    {
+      "week": 1,
+      "focus": "...",
+      "primary_resource": "...",
+      "secondary_resource": "...",
+      "checkpoint": "..."
+    }
+  ],
   "picked_course_urls": ["url from candidate list", ...],
   "extra_courses": [
     {

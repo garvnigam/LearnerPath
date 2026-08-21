@@ -41,3 +41,16 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   }
   return res.json() as Promise<T>
 }
+
+export async function apiGet<T>(path: string): Promise<T> {
+  const headers: Record<string, string> = {}
+  const token = await getAccessToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(`${API}${path}`, { method: 'GET', headers })
+  if (!res.ok) {
+    const t = await res.text()
+    throw new Error(`${res.status}: ${t}`)
+  }
+  return res.json() as Promise<T>
+}

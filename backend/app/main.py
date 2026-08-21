@@ -11,13 +11,13 @@ from .config import settings
 from .schemas import (
     ChatRequest, ChatResponse, ChatMessage,
     AssessmentRequest, AssessmentResponse, MCQ,
-    ScoreRequest, RecommendationResponse, Course,
+    ScoreRequest, RecommendationResponse, Course, WeekPlan, SavedPlanResponse,
 )
 from .azure_client import chat_json
 from .prompts import CHAT_SYSTEM, ASSESSMENT_SYSTEM, RECOMMEND_SYSTEM
 from .catalog import CURATED, filter_catalog
 from .mit_learn import fetch_mit_courses
-from .supabase_client import save_session
+from .supabase_client import save_session, get_latest_recommendation
 from .auth import Principal, require_user
 from .quota import start_session, enforce_active_session
 
@@ -114,11 +114,28 @@ def assessment(req: AssessmentRequest, user: Principal = Depends(enforce_active_
     if not settings.azure_openai_key:
         raise HTTPException(500, "Azure OpenAI not configured")
 
-    user_msg = f"""Generate 10 MCQs for:
+    round_no = req.round if req.round in (1, 2) else 1
+    id_offset = 0 if round_no == 1 else len(req.prior_questions)
+
+    if round_no == 1:
+        performance_note = "This is ROUND 1 — no prior performance yet."
+    else:
+        per_subject: dict[str, list[bool]] = {}
+        for q in req.prior_questions:
+            correct = req.prior_answers.get(q.id) == q.correct
+            per_subject.setdefault(q.subject or "general", []).append(correct)
+        lines = []
+        for subj, results in per_subject.items():
+            acc = sum(results) / max(1, len(results))
+            lines.append(f"  - {subj}: {sum(results)}/{len(results)} correct ({acc:.0%})")
+        performance_note = "This is ROUND 2 — round 1 performance per subject:\n" + "\n".join(lines)
+
+    user_msg = f"""Generate 5 MCQs for:
 - Subjects: {', '.join(req.topic_input.subjects)}
 - Focus areas: {', '.join(req.focus_areas) or 'general'}
-- Learner's stated background: unspecified
 - Goal: {req.topic_input.goal or 'general learning'}
+
+{performance_note}
 """
     try:
         data = chat_json(ASSESSMENT_SYSTEM, [{"role": "user", "content": user_msg}], temperature=0.4)
@@ -126,17 +143,21 @@ def assessment(req: AssessmentRequest, user: Principal = Depends(enforce_active_
         raise HTTPException(500, f"Azure OpenAI error: {e}")
 
     qs = data.get("questions", [])
-    if len(qs) < 10:
-        raise HTTPException(500, "Assessment generation returned <10 questions")
-    questions = [MCQ(**q) for q in qs[:10]]
+    if len(qs) < 5:
+        raise HTTPException(500, "Assessment generation returned <5 questions")
+    questions = []
+    for i, q in enumerate(qs[:5]):
+        q = {**q, "id": id_offset + i + 1}
+        questions.append(MCQ(**q))
 
     save_session(user.subject, req.session_id, {
         "stage": "assessment",
         "topic_input": req.topic_input.model_dump(),
         "focus_areas": req.focus_areas,
-        "questions": [q.model_dump() for q in questions],
+        "round": round_no,
+        "questions": [q.model_dump() for q in (req.prior_questions + questions)],
     })
-    return AssessmentResponse(questions=questions)
+    return AssessmentResponse(questions=questions, round=round_no)
 
 
 @app.post("/api/score", response_model=RecommendationResponse)
@@ -147,39 +168,62 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
     correct_count = 0
     wrong_topics = []
     right_topics = []
+    per_subject_counts: dict[str, list[int]] = {}  # subject -> [correct, total]
     for q in req.questions:
         picked = req.answers.get(q.id)
+        subj = q.subject or (req.topic_input.subjects[0] if req.topic_input.subjects else "general")
+        counts = per_subject_counts.setdefault(subj, [0, 0])
+        counts[1] += 1
         if picked == q.correct:
             correct_count += 1
+            counts[0] += 1
             right_topics.append(q.question[:80])
         else:
-            wrong_topics.append(f"Q{q.id} ({q.difficulty}): {q.question[:80]}")
+            wrong_topics.append(f"Q{q.id} ({q.difficulty}, {subj}): {q.question[:80]}")
 
-    # provisional level
-    if correct_count <= 3:
-        provisional = "beginner"
-    elif correct_count <= 7:
-        provisional = "intermediate"
-    else:
-        provisional = "advanced"
+    def level_from_ratio(correct: int, total: int) -> str:
+        ratio = correct / total if total else 0
+        if ratio <= 0.35:
+            return "beginner"
+        elif ratio <= 0.75:
+            return "intermediate"
+        return "advanced"
+
+    provisional_by_subject = {
+        subj: level_from_ratio(c, t) for subj, (c, t) in per_subject_counts.items()
+    }
+    # overall provisional = level of the subject the learner is weakest in (drives candidate filtering breadth)
+    provisional = level_from_ratio(correct_count, len(req.questions)) if req.questions else "beginner"
 
     # gather candidate courses
     mit = await fetch_mit_courses(req.topic_input.subjects + req.focus_areas, limit=12)
     curated = filter_catalog(req.topic_input.subjects + req.focus_areas, provisional)
     candidates = (mit + curated)[:40]
 
+    fmt_pref = ', '.join(req.topic_input.preferred_formats) or 'no preference'
+    pace_pref = req.topic_input.pace or 'no preference'
+
     candidate_lines = [
         f"- [{c['level']}] ({c.get('format','course')}) {c['title']} — {c['provider']} -> {c['url']}"
         for c in candidates
     ]
+
+    subject_level_lines = "\n".join(
+        f"  - {subj}: {c}/{t} correct -> provisional {provisional_by_subject[subj]}"
+        for subj, (c, t) in per_subject_counts.items()
+    )
 
     prompt = f"""Learner:
 - Subjects: {', '.join(req.topic_input.subjects)}
 - Focus: {', '.join(req.focus_areas)}
 - Duration: {req.topic_input.duration_months} months, {req.topic_input.hours_per_day} hrs/day
 - Goal: {req.topic_input.goal or 'general'}
+- Preferred formats: {fmt_pref}
+- Preferred pace: {pace_pref}
 
-Quiz: {correct_count}/{len(req.questions)} correct (provisional level: {provisional})
+Quiz: {correct_count}/{len(req.questions)} correct overall.
+Per-subject provisional level:
+{subject_level_lines}
 Correct topics: {right_topics[:5]}
 Wrong topics: {wrong_topics[:5]}
 
@@ -214,13 +258,27 @@ Candidate courses (prefer these, use exact URLs). You may also add up to 3 world
     if not picked_courses:
         picked_courses = [Course(**c) for c in candidates[:6]]
 
+    weekly_plan = []
+    for i, wp in enumerate(data.get("weekly_plan", []) or []):
+        try:
+            wp.setdefault("week", i + 1)
+            weekly_plan.append(WeekPlan(**wp))
+        except Exception:
+            continue
+
+    level_by_subject = {
+        subj: data.get("level_by_subject", {}).get(subj, provisional_by_subject.get(subj, provisional))
+        for subj in req.topic_input.subjects
+    }
+
     resp = RecommendationResponse(
         level=data.get("level", provisional),
+        level_by_subject=level_by_subject,
         score=correct_count,
         total=len(req.questions),
         strengths=data.get("strengths", []),
         gaps=data.get("gaps", []),
-        weekly_plan=data.get("weekly_plan", ""),
+        weekly_plan=weekly_plan,
         courses=picked_courses,
     )
 
@@ -229,7 +287,38 @@ Candidate courses (prefer these, use exact URLs). You may also add up to 3 world
         "topic_input": req.topic_input.model_dump(),
         "focus_areas": req.focus_areas,
         "score": correct_count,
+        "total": resp.total,
         "level": resp.level,
+        "level_by_subject": resp.level_by_subject,
+        "strengths": resp.strengths,
+        "gaps": resp.gaps,
+        "weekly_plan": [w.model_dump() for w in resp.weekly_plan],
         "courses": [c.model_dump() for c in resp.courses],
     })
     return resp
+
+
+@app.get("/api/plan/{user_id}", response_model=SavedPlanResponse)
+def get_plan(user_id: str, user: Principal = Depends(enforce_active_session)):
+    # When real auth is configured, always look up by the authenticated subject —
+    # never trust the path param's user_id, or one user could read another's plan.
+    lookup_id = user.subject if user.subject and user.subject != "anonymous" else user_id
+    saved = get_latest_recommendation(lookup_id)
+    if not saved or not saved.get("topic_input"):
+        raise HTTPException(404, "No saved plan found for this user")
+    try:
+        return SavedPlanResponse(
+            topic_input=saved["topic_input"],
+            recommendation=RecommendationResponse(
+                level=saved.get("level", "beginner"),
+                level_by_subject=saved.get("level_by_subject", {}),
+                score=saved.get("score", 0),
+                total=saved.get("total", 0),
+                strengths=saved.get("strengths", []),
+                gaps=saved.get("gaps", []),
+                weekly_plan=[WeekPlan(**w) for w in saved.get("weekly_plan", [])],
+                courses=[Course(**c) for c in saved.get("courses", [])],
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Saved plan is malformed: {e}")

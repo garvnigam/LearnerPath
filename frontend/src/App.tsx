@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMsal, useIsAuthenticated } from '@azure/msal-react'
-import type { TopicInput, ChatMessage, RecommendationResponse, MCQ } from './lib/types'
+import type { TopicInput, ChatMessage, RecommendationResponse, MCQ, SavedPlanResponse } from './lib/types'
 import { entraConfigured } from './lib/authConfig'
 import { useSessionQuota } from './lib/useSessionQuota'
 import TabTopics from './components/TabTopics'
@@ -157,11 +157,17 @@ export default function App() {
 
         {stage === 'topics' && (
           <TabTopics
+            userId={userId}
             onSubmit={(ti) => {
               setTopicInput(ti)
               setMessages([])
               setFocusAreas([])
               setStage('chat')
+            }}
+            onResume={(plan: SavedPlanResponse) => {
+              setTopicInput(plan.topic_input)
+              setRecommendation(plan.recommendation)
+              setStage('results')
             }}
           />
         )}
