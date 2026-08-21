@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: learnerpath-api-adfuhccbb0gbdzhz
+  AZURE_WEBAPP_NAME: learnerpath-api
   PYTHON_VERSION: "3.11"
 
 jobs:
