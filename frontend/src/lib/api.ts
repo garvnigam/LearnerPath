@@ -4,25 +4,30 @@ import { InteractionRequiredAuthError } from '@azure/msal-browser'
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
 async function getAccessToken(): Promise<string | null> {
-  if (!entraConfigured) return null
-  const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0]
-  if (!account) return null
-  try {
-    const res = await msalInstance.acquireTokenSilent({ ...apiTokenRequest, account })
-    return res.accessToken || res.idToken || null
-  } catch (e) {
-    console.warn('[msal] silent token acquisition failed', e)
-    if (e instanceof InteractionRequiredAuthError) {
-      try {
-        const res = await msalInstance.acquireTokenPopup({ ...apiTokenRequest, account })
-        return res.accessToken || res.idToken || null
-      } catch (err) {
-        console.error('[msal] popup token acquisition failed', err)
-        throw new Error('Sign-in required. Please sign in again.')
-      }
-    }
-    throw new Error('Unable to acquire access token. Please sign in again.')
-  }
+  // DEV: login disabled temporarily — skip MSAL token acquisition entirely so a stale/
+  // cached account doesn't trigger a background network call to Microsoft that can fail.
+  // Uncomment the block below to re-enable once login is turned back on.
+  return null
+
+  // if (!entraConfigured) return null
+  // const account = msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0]
+  // if (!account) return null
+  // try {
+  //   const res = await msalInstance.acquireTokenSilent({ ...apiTokenRequest, account })
+  //   return res.accessToken || res.idToken || null
+  // } catch (e) {
+  //   console.warn('[msal] silent token acquisition failed', e)
+  //   if (e instanceof InteractionRequiredAuthError) {
+  //     try {
+  //       const res = await msalInstance.acquireTokenPopup({ ...apiTokenRequest, account })
+  //       return res.accessToken || res.idToken || null
+  //     } catch (err) {
+  //       console.error('[msal] popup token acquisition failed', err)
+  //       throw new Error('Sign-in required. Please sign in again.')
+  //     }
+  //   }
+  //   throw new Error('Unable to acquire access token. Please sign in again.')
+  // }
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
