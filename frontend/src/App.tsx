@@ -38,9 +38,11 @@ export default function App() {
     }
   }, [accounts])
 
-  if (entraConfigured && !isAuthenticated) {
-    return <LoginPage />
-  }
+  // DEV: Entra login gate disabled temporarily — hindering local development.
+  // Uncomment to re-enable login enforcement.
+  // if (entraConfigured && !isAuthenticated) {
+  //   return <LoginPage />
+  // }
 
   if (session.status === 'blocked') {
     return (

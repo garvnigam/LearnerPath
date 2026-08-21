@@ -102,24 +102,28 @@ def _decode_token(token: str) -> dict:
 
 
 async def require_user(authorization: Optional[str] = Header(default=None)) -> Principal:
-    if settings.entra_auth_disabled:
-        return Principal(subject="anonymous", phone=None, name=None, claims={})
+    # DEV: Entra auth enforcement disabled temporarily — hindering local development.
+    # Remove this early return (and uncomment the block below) to re-enable.
+    return Principal(subject="anonymous", phone=None, name=None, claims={})
 
-    if not settings.entra_tenant_id or not settings.entra_tenant_subdomain or not settings.entra_api_client_id:
-        # Auth not configured yet — behave like the escape hatch so dev/demo still works.
-        return Principal(subject="anonymous", phone=None, name=None, claims={})
-
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
-
-    token = authorization.split(" ", 1)[1].strip()
-    claims = _decode_token(token)
-    return Principal(
-        subject=str(claims.get("sub", "")),
-        phone=claims.get("phone_number") or claims.get("phoneNumber"),
-        name=claims.get("name") or claims.get("preferred_username"),
-        claims=claims,
-    )
+    # if settings.entra_auth_disabled:
+    #     return Principal(subject="anonymous", phone=None, name=None, claims={})
+    #
+    # if not settings.entra_tenant_id or not settings.entra_tenant_subdomain or not settings.entra_api_client_id:
+    #     # Auth not configured yet — behave like the escape hatch so dev/demo still works.
+    #     return Principal(subject="anonymous", phone=None, name=None, claims={})
+    #
+    # if not authorization or not authorization.lower().startswith("bearer "):
+    #     raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing bearer token")
+    #
+    # token = authorization.split(" ", 1)[1].strip()
+    # claims = _decode_token(token)
+    # return Principal(
+    #     subject=str(claims.get("sub", "")),
+    #     phone=claims.get("phone_number") or claims.get("phoneNumber"),
+    #     name=claims.get("name") or claims.get("preferred_username"),
+    #     claims=claims,
+    # )
 
 
 CurrentUser = Depends(require_user)
