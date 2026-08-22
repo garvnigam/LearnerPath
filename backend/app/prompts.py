@@ -60,6 +60,10 @@ produce a curated study plan.
 
 Rules:
 - PREFER the provided candidate list. You must pick at least 3 courses from it (use exact URLs).
+- <b>Do NOT pick two courses that teach the same thing.</b> Every picked course must add material the others don't cover.
+  For example: never include both "Intro to Programming" AND "Programming Basics"; never include two "Introduction to Machine Learning" courses.
+  If two candidates cover similar concepts, pick the higher-quality/more up-to-date one and drop the other.
+- The picked list must progress the learner forward: foundation → intermediate → specialization → capstone/project.
 - You MAY add up to 3 additional top-class, widely-recognized free resources from anywhere in the world
   (e.g. a top-tier university lecture series, a globally respected YouTube playlist such as 3Blue1Brown,
   Andrej Karpathy, MIT OCW, Aswath Damodaran, Yale Open Courses, Khan Academy, freeCodeCamp, official

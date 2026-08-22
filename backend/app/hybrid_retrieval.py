@@ -171,11 +171,15 @@ async def gather_candidates(
         merged.extend(r)
 
     deduped = _dedupe_by_url(merged)
+    # Also collapse near-duplicates by concept overlap so the planner doesn't
+    # see multiple beginner courses covering the same skills.
+    deduped = _dedupe_by_concept_overlap(deduped)
 
     if allow_llm_fallback and len(deduped) < 12:
         extras = await fetch_llm_extras(subjects, focus, level, needed=12 - len(deduped))
         deduped.extend(extras)
         deduped = _dedupe_by_url(deduped)
+        deduped = _dedupe_by_concept_overlap(deduped)
 
     return deduped[:total_target]
 
@@ -190,3 +194,33 @@ def _dedupe_by_url(rows: list[dict]) -> list[dict]:
         seen.add(url)
         out.append(r)
     return out
+
+
+def _dedupe_by_concept_overlap(rows: list[dict], overlap_ratio: float = 0.6) -> list[dict]:
+    """Drop later rows that share >= overlap_ratio of their concepts (or topics if no concepts)
+    with any earlier kept row. Runs after URL dedupe. Preserves order (which reflects rank).
+
+    This prevents e.g. 'Intro to Programming' + 'Programming Basics' both appearing.
+    """
+    kept: list[dict] = []
+    kept_concept_sets: list[set[str]] = []
+    for r in rows:
+        cs = {c.lower().strip() for c in (r.get("concepts") or []) if c}
+        if not cs:
+            cs = {t.lower().strip() for t in (r.get("topics") or []) if t}
+        if not cs:
+            kept.append(r)
+            kept_concept_sets.append(set())
+            continue
+        is_dup = False
+        for prev in kept_concept_sets:
+            if not prev:
+                continue
+            common = cs & prev
+            if len(common) / max(1, min(len(cs), len(prev))) >= overlap_ratio:
+                is_dup = True
+                break
+        if not is_dup:
+            kept.append(r)
+            kept_concept_sets.append(cs)
+    return kept
