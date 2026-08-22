@@ -17,8 +17,17 @@ from .mit_learn import fetch_mit_courses
 from .supabase_client import get_supabase
 
 
-# ------------- Source: internal DB (works for Supabase OR Azure PG via Supabase-compatible client) -------------
-async def fetch_db(subjects: list[str], focus: list[str], level: str, budget: str = "prefer_free", limit: int = 40) -> list[dict]:
+# ------------- Source: internal DB (unified `courses` table via match_courses RPC) -------------
+async def fetch_db(
+    subjects: list[str],
+    focus: list[str],
+    level: str,
+    budget: str = "prefer_free",
+    limit: int = 40,
+    concepts: list[str] | None = None,
+    max_hours: float | None = None,
+    language: str = "en",
+) -> list[dict]:
     sb = get_supabase()
     if not sb:
         return []
@@ -26,31 +35,36 @@ async def fetch_db(subjects: list[str], focus: list[str], level: str, budget: st
     if not topics:
         return []
 
-    q = sb.table("courses").select("*") if _table_exists(sb, "courses") else sb.table("harvard_pll_courses").select("*")
-
-    # array overlap on topics
-    q = q.overlaps("topics", topics)
-
-    # level widening: allow ±1 tier
-    levels = _nearby_levels(level)
-    q = q.in_("level", levels)
-
-    if budget == "free_only":
-        q = q.eq("price_type", "free")
+    price_types = ["free", "audit_free"] if budget == "free_only" else ["free", "audit_free", "paid", "freemium"]
+    params = {
+        "q_topics": topics,
+        "q_concepts": concepts or [],
+        "level_in": _nearby_levels(level),
+        "price_types": price_types,
+        "language_in": [language, "en"],
+        "max_hours": max_hours,
+        "max_count": limit,
+    }
 
     try:
+        # Preferred: single-query RPC on the unified `courses` table
+        res = sb.rpc("match_courses", params).execute()
+        rows = res.data or []
+        if rows:
+            return rows
+    except Exception as e:
+        print(f"[hybrid] match_courses RPC failed, falling back to table select: {e}")
+
+    # Fallback: legacy harvard_pll_courses table
+    try:
+        q = sb.table("harvard_pll_courses").select("*")
+        q = q.overlaps("topics", topics).in_("level", _nearby_levels(level))
+        if budget == "free_only":
+            q = q.eq("price_type", "free")
         return q.limit(limit).execute().data or []
     except Exception as e:
         print(f"[hybrid] db fetch failed: {e}")
         return []
-
-
-def _table_exists(sb, name: str) -> bool:
-    try:
-        sb.table(name).select("id", head=True, count="exact").limit(1).execute()
-        return True
-    except Exception:
-        return False
 
 
 def _nearby_levels(level: str) -> list[str]:
