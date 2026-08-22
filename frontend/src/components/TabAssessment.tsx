@@ -38,14 +38,22 @@ export default function TabAssessment({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const roundOneQuestions = questions.slice(0, 5)
-  const roundTwoQuestions = questions.slice(5, 10)
+  // round 1 questions are whatever came back on the first call; round 2 are the rest
+  const [roundOneCount, setRoundOneCount] = useState<number>(0)
+  useEffect(() => {
+    if (roundOneCount === 0 && questions.length > 0 && round === 1) {
+      setRoundOneCount(questions.length)
+    }
+  }, [questions.length, round, roundOneCount])
+
+  const roundOneQuestions = questions.slice(0, roundOneCount || questions.length)
+  const roundTwoQuestions = questions.slice(roundOneCount)
   const visibleQuestions = round === 1 ? roundOneQuestions : questions
 
   const answered = Object.keys(answers).length
   const roundOneAnswered = roundOneQuestions.filter((q) => answers[q.id]).length
-  const canAdvance = round === 1 && roundOneAnswered === roundOneQuestions.length && roundOneQuestions.length === 5
-  const canSubmit = round === 2 && answered === questions.length && questions.length === 10
+  const canAdvance = round === 1 && roundOneQuestions.length > 0 && roundOneAnswered === roundOneQuestions.length
+  const canSubmit = round === 2 && answered === questions.length && questions.length > 0
 
   async function advanceToRound2() {
     setAdvancing(true)
@@ -105,15 +113,15 @@ export default function TabAssessment({
           <h2 className="text-lg font-semibold">Adaptive quiz — round {round} of 2</h2>
           <p className="text-sm text-slate-400">
             {round === 1
-              ? 'Answer these 5 to help us find your level.'
-              : 'These 5 are targeted at your boundary — answer to lock in your path.'}
+              ? `Answer these ${roundOneQuestions.length} to help us find your level in each subject.`
+              : `These ${roundTwoQuestions.length} are targeted at your boundary — answer to lock in your path.`}
           </p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
             <div className="text-2xl font-bold">
               {round === 1 ? roundOneAnswered : answered}
-              <span className="text-slate-500">/{round === 1 ? 5 : questions.length}</span>
+              <span className="text-slate-500">/{round === 1 ? roundOneQuestions.length : questions.length}</span>
             </div>
             <div className="text-xs text-slate-400">answered</div>
           </div>
@@ -121,7 +129,7 @@ export default function TabAssessment({
             <div
               className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
               style={{
-                width: `${((round === 1 ? roundOneAnswered : answered) / (round === 1 ? 5 : Math.max(1, questions.length))) * 100}%`,
+                width: `${((round === 1 ? roundOneAnswered : answered) / Math.max(1, round === 1 ? roundOneQuestions.length : questions.length)) * 100}%`,
               }}
             />
           </div>

@@ -20,12 +20,13 @@ Return STRICT JSON:
 """
 
 ASSESSMENT_SYSTEM = """You are an expert assessment designer building an adaptive (CAT-lite) quiz.
-Generate EXACTLY 5 multiple-choice questions per call.
+The user message will tell you EXACTLY how many MCQs to generate this call (scales with subject count).
 
 Rules:
 - Every question MUST be tagged with a "subject" field naming exactly one of the learner's chosen subjects (use the subject strings given, verbatim).
-- Spread the 5 questions across the learner's subjects as evenly as possible.
-- If this is ROUND 1 (no prior performance given): mix difficulties roughly evenly (beginner/intermediate/advanced) per subject to probe a wide range.
+- Spread questions EVENLY across the learner's subjects. If they picked 3 subjects and you're asked for 12 questions, that's 4 per subject.
+- Each subject's mini-test should stand on its own as a fair gauge of that subject.
+- If this is ROUND 1 (no prior performance given): within each subject, mix difficulties roughly evenly (beginner/intermediate/advanced) to probe a wide range.
 - If this is ROUND 2 (prior round performance given per subject): target each subject's questions at the DIFFICULTY BOUNDARY implied by that subject's round-1 accuracy — e.g. if the learner got round-1 questions in a subject mostly right, weight round-2 questions in that subject toward intermediate/advanced to pinpoint their ceiling; if mostly wrong, weight toward beginner/intermediate to pinpoint their floor. Do not simply repeat round 1's difficulty mix.
 - 4 options (A-D), exactly one correct, plausible distractors.
 - Questions must be answerable without external context (self-contained).
@@ -48,8 +49,7 @@ Return STRICT JSON:
       "correct": "A|B|C|D",
       "explanation": "...",
       "difficulty": "beginner|intermediate|advanced"
-    },
-    ... 5 total
+    }
   ]
 }
 """

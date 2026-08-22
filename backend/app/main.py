@@ -16,6 +16,7 @@ from .schemas import (
 from .azure_client import chat_json
 from .prompts import CHAT_SYSTEM, ASSESSMENT_SYSTEM, RECOMMEND_SYSTEM
 from .catalog import CURATED, filter_catalog
+from .hybrid_retrieval import gather_candidates
 from .mit_learn import fetch_mit_courses
 from .supabase_client import save_session, get_latest_recommendation
 from .auth import Principal, require_user
@@ -117,23 +118,31 @@ def assessment(req: AssessmentRequest, user: Principal = Depends(enforce_active_
     round_no = req.round if req.round in (1, 2) else 1
     id_offset = 0 if round_no == 1 else len(req.prior_questions)
 
+    # scale question count with number of subjects: 4 per subject per round, capped 20
+    n_subjects = max(1, len(req.topic_input.subjects))
+    per_subject = 4
+    n_questions = min(20, per_subject * n_subjects)
+
     if round_no == 1:
         performance_note = "This is ROUND 1 — no prior performance yet."
     else:
-        per_subject: dict[str, list[bool]] = {}
+        per_subject_perf: dict[str, list[bool]] = {}
         for q in req.prior_questions:
             correct = req.prior_answers.get(q.id) == q.correct
-            per_subject.setdefault(q.subject or "general", []).append(correct)
+            per_subject_perf.setdefault(q.subject or "general", []).append(correct)
         lines = []
-        for subj, results in per_subject.items():
+        for subj, results in per_subject_perf.items():
             acc = sum(results) / max(1, len(results))
             lines.append(f"  - {subj}: {sum(results)}/{len(results)} correct ({acc:.0%})")
         performance_note = "This is ROUND 2 — round 1 performance per subject:\n" + "\n".join(lines)
 
-    user_msg = f"""Generate 5 MCQs for:
-- Subjects: {', '.join(req.topic_input.subjects)}
+    user_msg = f"""Generate {n_questions} MCQs for:
+- Subjects (test each one separately): {', '.join(req.topic_input.subjects)}
 - Focus areas: {', '.join(req.focus_areas) or 'general'}
 - Goal: {req.topic_input.goal or 'general learning'}
+
+Distribute the {n_questions} questions EVENLY: approximately {per_subject} per subject.
+Each question's "subject" field MUST be one of the listed subjects verbatim.
 
 {performance_note}
 """
@@ -143,10 +152,10 @@ def assessment(req: AssessmentRequest, user: Principal = Depends(enforce_active_
         raise HTTPException(500, f"Azure OpenAI error: {e}")
 
     qs = data.get("questions", [])
-    if len(qs) < 5:
-        raise HTTPException(500, "Assessment generation returned <5 questions")
+    if len(qs) < max(3, n_questions // 2):
+        raise HTTPException(500, f"Assessment generation returned only {len(qs)} questions")
     questions = []
-    for i, q in enumerate(qs[:5]):
+    for i, q in enumerate(qs[:n_questions]):
         q = {**q, "id": id_offset + i + 1}
         questions.append(MCQ(**q))
 
@@ -195,10 +204,17 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
     # overall provisional = level of the subject the learner is weakest in (drives candidate filtering breadth)
     provisional = level_from_ratio(correct_count, len(req.questions)) if req.questions else "beginner"
 
-    # gather candidate courses
-    mit = await fetch_mit_courses(req.topic_input.subjects + req.focus_areas, limit=12)
-    curated = filter_catalog(req.topic_input.subjects + req.focus_areas, provisional)
-    candidates = (mit + curated)[:40]
+    # gather candidate courses from DB + live APIs + curated + optional LLM fallback,
+    # querying PER SUBJECT at that subject's own level so the pool reflects each subject's ceiling.
+    candidates = await gather_candidates(
+        subjects=req.topic_input.subjects,
+        focus=req.focus_areas,
+        level=provisional,
+        budget=getattr(req.topic_input, "budget_type", "prefer_free"),
+        total_target=40,
+        allow_llm_fallback=True,
+        level_by_subject=provisional_by_subject,
+    )
 
     fmt_pref = ', '.join(req.topic_input.preferred_formats) or 'no preference'
     pace_pref = req.topic_input.pace or 'no preference'

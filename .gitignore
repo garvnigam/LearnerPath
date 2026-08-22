@@ -17,3 +17,6 @@ frontend/.env
 .idea/
 learnerpath-api.PublishSettings
 *.PublishSettings
+harvard_pll_courses.json
+scripts/.harvard_pll_checkpoint.json
+scripts/harvard_pll_courses.json
