@@ -142,21 +142,26 @@ def upsert_concepts(supabase, updates: list[tuple[str, dict]]) -> int:
 
 
 def fetch_rows(supabase, refresh: bool, limit: int | None) -> list[Row]:
-    """Fetch rows that need tagging."""
+    """Fetch rows that need tagging. Deduplicates by id in case of page overlap."""
     all_rows: list[Row] = []
+    seen_ids: set[str] = set()
     page = 0
-    page_size = 500
+    page_size = 1000  # Supabase max per query
 
     while True:
         q = supabase.table("courses").select("id,title,description,topics,level")
         if not refresh:
-            # concepts empty array means untagged
             q = q.eq("concepts", "{}")
-        q = q.range(page * page_size, (page + 1) * page_size - 1)
+        # order by id for stable pagination
+        q = q.order("id").range(page * page_size, (page + 1) * page_size - 1)
         data = q.execute().data or []
         if not data:
             break
+        added = 0
         for d in data:
+            if d["id"] in seen_ids:
+                continue
+            seen_ids.add(d["id"])
             all_rows.append(Row(
                 id=d["id"],
                 title=d["title"],
@@ -164,9 +169,10 @@ def fetch_rows(supabase, refresh: bool, limit: int | None) -> list[Row]:
                 topics=d.get("topics") or [],
                 level=d.get("level") or "intermediate",
             ))
+            added += 1
             if limit and len(all_rows) >= limit:
                 return all_rows
-        if len(data) < page_size:
+        if added == 0 or len(data) < page_size:
             break
         page += 1
     return all_rows

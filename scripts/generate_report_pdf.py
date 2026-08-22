@@ -160,7 +160,7 @@ flow = [
     ["6", "Quiz tab fires <b>POST /api/assessment</b> (round 1). Backend calls Azure OpenAI to generate ~4 MCQs per subject.", "Browser → App Service → Azure OpenAI"],
     ["7", "User answers round 1, advances. Backend generates round 2 MCQs adaptively based on per-subject accuracy.", "Browser → App Service → Azure OpenAI"],
     ["8", "User submits. Frontend fires <b>POST /api/score</b>. This is the heaviest call — see next section.", "Browser → App Service"],
-    ["9", "Backend computes provisional level per subject, calls <b>hybrid_retrieval.gather_candidates()</b> to build a candidate pool of ~40 courses across sources, then invokes Azure OpenAI as the planner with RECOMMEND_SYSTEM prompt.", "App Service → Supabase + MIT Learn API + Azure OpenAI"],
+    ["9", "Backend computes provisional level per subject, calls <b>hybrid_retrieval.gather_candidates()</b> to build a candidate pool of ~40 courses (all from the Supabase <b>courses</b> table + static curated fallback), then invokes Azure OpenAI as the planner with RECOMMEND_SYSTEM prompt.", "App Service → Supabase + Azure OpenAI"],
     ["10", "Backend saves the session (topic_input + score + level + courses + weekly_plan) to Supabase.", "App Service → Supabase"],
     ["11", "Response returned to browser; user sees the personalized path.", "Browser"],
 ]
@@ -179,8 +179,7 @@ story.append(P(
 story.append(P("3.1 Data sources fired in parallel", H2))
 sources = [
     ["Source", "Type", "Latency", "Coverage"],
-    ["Supabase <b>courses</b> table (25k rows)", "Postgres RPC <b>match_courses</b>", "~80-150 ms", "All ingested sources (see §4)"],
-    ["MIT Learn REST API", "Live public JSON", "~200-400 ms", "MIT OCW real-time (~3k courses)"],
+    ["Supabase <b>courses</b> table (25k rows)", "Postgres RPC <b>match_courses</b>", "~80-150 ms", "All 6 ingested sources (Harvard PLL, MIT Learn, Microsoft Learn, freeCodeCamp, NUSMods, YouTube)"],
     ["Static curated catalog (backend/app/catalog.py)", "Python module", "instant", "Hand-picked classics"],
     ["LLM fallback (only if pool < 12)", "Azure OpenAI + HEAD-request validation", "~1-2 s (rare)", "URLs on youtube.com, coursera.org, edx.org, mit.edu, stanford.edu, harvard.edu, nptel.ac.in, khanacademy.org, freecodecamp.org, 3blue1brown.com, fast.ai"],
 ]
@@ -445,7 +444,7 @@ repo = [
     ["backend/app/schemas.py", "Pydantic request/response models."],
     ["backend/app/azure_client.py", "Azure OpenAI wrapper (JSON-mode chat completions)."],
     ["backend/app/supabase_client.py", "Supabase Python client + save_session / get_latest_recommendation."],
-    ["backend/app/mit_learn.py", "Live MIT Learn API fetcher used inside hybrid_retrieval."],
+    ["backend/app/mit_learn.py", "MIT Learn API client (kept for ad-hoc queries; not used at runtime — MIT rows already in Supabase)."],
     ["backend/app/catalog.py", "Small hand-curated static catalog (legacy, still used as fallback)."],
     ["frontend/src/App.tsx", "Root React component, 4-tab flow."],
     ["frontend/src/components/Tab*.tsx", "Topics / Chat / Assessment / Results tabs."],
@@ -473,7 +472,7 @@ compare = [
     ["Coverage", "Whatever the LLM remembers", "25k+ real courses from 7 sources, growing"],
     ["Personalization", "Prompt engineering only", "Per-subject level + gaps + goal + budget + pace"],
     ["Level correctness", "Provider label only", "Provider label + ±1 filter + per-subject + concept intersection (once tagged)"],
-    ["Freshness", "Frozen at model cutoff", "Live MIT Learn API + weekly re-ingest cron"],
+    ["Freshness", "Frozen at model cutoff", "Weekly re-ingest cron refreshes all 25k rows from source APIs"],
     ["Cost per 1k sessions", "$80-150 (web search calls)", "$30-40"],
     ["Reproducibility", "None (temperature-driven)", "Deterministic ranking + LLM only re-ranks"],
 ]

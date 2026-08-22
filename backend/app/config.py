@@ -26,7 +26,15 @@ class Settings(BaseSettings):
     login_allowlist_ips: str = "127.0.0.1,::1"         # comma-separated IPs exempted from IP block
     single_login_enforced: bool = True                 # if True, non-allowlisted users can only log in once
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
+    # Optional: embedding deployment for semantic retrieval
+    embeddings_model_endpoint: str = ""
+    embeddings_model_key: str = ""
+    embeddings_model_deployment: str = "text-embedding-3-small"
+
+    # Optional: YouTube API key (used by ingestor scripts, not runtime)
+    youtube_api_key: str = ""
+
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
 settings = Settings()

@@ -1,11 +1,12 @@
 """Hybrid course retrieval:
-1. Query internal DB (Azure Postgres or Supabase).
-2. Query live public APIs (MIT Learn, NPTEL, ...).
+1. Query internal DB (Supabase `courses` table — 25k+ rows across MIT, Harvard, MS Learn, NUS, freeCodeCamp, YouTube).
+2. Query local curated catalog as a safety net.
 3. Optionally ask the LLM to propose extras with a web search tool.
 4. Dedupe, score, return top-K to the ranker/planner.
 
-Every source implements the same interface: `async def fetch(...) -> list[dict]`.
-Sources are pluggable; add/remove in `SOURCES`.
+MIT Learn API is NOT called live anymore — those 3,041 rows are already persisted
+in the unified `courses` table via `scripts/sources/ingest_mit_learn.py`. Re-run
+that script weekly (via GitHub Actions cron) to stay fresh.
 """
 from __future__ import annotations
 
@@ -13,7 +14,6 @@ import asyncio
 from typing import Callable, Awaitable
 
 from .catalog import CURATED, filter_catalog
-from .mit_learn import fetch_mit_courses
 from .supabase_client import get_supabase
 
 
@@ -75,11 +75,6 @@ def _nearby_levels(level: str) -> list[str]:
     return order[max(0, i-1): min(3, i+2)]
 
 
-# ------------- Source: MIT Learn API (already wired) -------------
-async def fetch_mit(subjects: list[str], focus: list[str], level: str, limit: int = 20) -> list[dict]:
-    return await fetch_mit_courses(subjects + focus, limit=limit)
-
-
 # ------------- Source: local curated catalog -------------
 async def fetch_curated(subjects: list[str], focus: list[str], level: str, limit: int = 20) -> list[dict]:
     return filter_catalog(subjects + focus, level)[:limit]
@@ -133,7 +128,6 @@ async def fetch_llm_extras(subjects: list[str], focus: list[str], level: str, ne
 
 SOURCES: list[tuple[str, Callable[..., Awaitable[list[dict]]]]] = [
     ("db",       fetch_db),
-    ("mit",      fetch_mit),
     ("curated",  fetch_curated),
 ]
 
@@ -156,14 +150,14 @@ async def gather_candidates(
     level_by_subject = level_by_subject or {s: level for s in subjects}
 
     tasks: list[Awaitable[list[dict]]] = []
-    # One (db+mit+curated) pass per subject, sized to leave room for merging.
+    # One (db + curated) pass per subject at that subject's own level.
+    # MIT/Harvard/MS/NUS/YouTube/FCC are all in the unified `courses` table already,
+    # so the DB query covers them via `match_courses` RPC.
     per_subject_limit = max(6, total_target // max(1, len(subjects)))
     for subj in subjects:
         subj_level = level_by_subject.get(subj, level)
-        # topics passed = only this subject + focus areas (keep it focused)
         tasks.extend([
             fetch_db([subj], focus, subj_level, budget=budget, limit=per_subject_limit),
-            fetch_mit([subj], focus, subj_level, limit=max(4, per_subject_limit // 2)),
             fetch_curated([subj], focus, subj_level, limit=max(4, per_subject_limit // 2)),
         ])
 
