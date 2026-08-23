@@ -159,6 +159,30 @@ export default function TabResults({ recommendation: r, topicInput, onRestart }:
                       {c.format === 'playlist' ? '▶ Playlist' : c.format}
                     </span>
                   )}
+                  {(() => {
+                    const pt = c.price_type
+                    if (!pt || pt === 'free') {
+                      return (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300">
+                          Free
+                        </span>
+                      )
+                    }
+                    if (pt === 'audit_free') {
+                      return (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 text-emerald-300">
+                          Audit free
+                        </span>
+                      )
+                    }
+                    // paid or freemium
+                    const price = c.price_amount ? `$${Math.round(c.price_amount)}` : 'Paid'
+                    return (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300">
+                        {price}
+                      </span>
+                    )
+                  })()}
                 </div>
               </motion.a>
 

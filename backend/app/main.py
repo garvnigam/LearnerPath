@@ -210,7 +210,7 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
         subjects=req.topic_input.subjects,
         focus=req.focus_areas,
         level=provisional,
-        budget=getattr(req.topic_input, "budget_type", "prefer_free"),
+        budget=req.topic_input.budget,
         total_target=40,
         allow_llm_fallback=True,
         level_by_subject=provisional_by_subject,
@@ -220,7 +220,7 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
     pace_pref = req.topic_input.pace or 'no preference'
 
     candidate_lines = [
-        f"- [{c['level']}] ({c.get('format','course')}) {c['title']} — {c['provider']} -> {c['url']}"
+        f"- [{c['level']}] ({c.get('format','course')}, {c.get('price_type','free')}) {c['title']} — {c['provider']} -> {c['url']}"
         for c in candidates
     ]
 
@@ -236,6 +236,7 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
 - Goal: {req.topic_input.goal or 'general'}
 - Preferred formats: {fmt_pref}
 - Preferred pace: {pace_pref}
+- Budget: {'free courses only' if getattr(req.topic_input, 'budget', 'free_only') == 'free_only' else 'open to free and paid courses'}
 
 Quiz: {correct_count}/{len(req.questions)} correct overall.
 Per-subject provisional level:

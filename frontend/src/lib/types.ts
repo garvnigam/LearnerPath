@@ -1,6 +1,7 @@
 export type GoalType = 'job' | 'certification' | 'project' | 'curiosity' | 'exam_prep'
 export type FormatPref = 'video' | 'text' | 'hands-on'
 export type PacePref = 'solo' | 'cohort' | 'paced'
+export type BudgetPref = 'free_only' | 'free_and_paid'
 
 export type TopicInput = {
   user_id?: string | null
@@ -10,6 +11,7 @@ export type TopicInput = {
   goal?: GoalType
   preferred_formats: FormatPref[]
   pace?: PacePref
+  budget: BudgetPref
 }
 
 export type ChatMessage = { role: 'user' | 'assistant' | 'system'; content: string }
@@ -41,6 +43,10 @@ export type Course = {
   image?: string | null
   topics: string[]
   format?: 'course' | 'playlist' | 'lectures' | null
+  price_type?: 'free' | 'audit_free' | 'paid' | 'freemium' | null
+  price_amount?: number | null
+  price_currency?: string | null
+  certificate_price?: number | null
 }
 
 export type WeekPlan = {

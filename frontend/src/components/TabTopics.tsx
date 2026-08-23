@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { FormatPref, GoalType, PacePref, SavedPlanResponse, TopicInput } from '../lib/types'
+import type { BudgetPref, FormatPref, GoalType, PacePref, SavedPlanResponse, TopicInput } from '../lib/types'
 import { Rocket, History, Loader2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { apiGet } from '../lib/api'
@@ -31,6 +31,11 @@ const PACES: { id: PacePref; label: string }[] = [
   { id: 'paced', label: 'Paced w/ deadlines' },
 ]
 
+const BUDGETS: { id: BudgetPref; label: string; hint: string }[] = [
+  { id: 'free_only',     label: 'Free only',              hint: "I don't want to pay for anything" },
+  { id: 'free_and_paid', label: 'Open to free + paid',    hint: 'Show me the best, paid or not' },
+]
+
 export default function TabTopics({
   userId,
   onSubmit,
@@ -47,6 +52,7 @@ export default function TabTopics({
   const [goal, setGoal] = useState<GoalType | undefined>(undefined)
   const [formats, setFormats] = useState<FormatPref[]>([])
   const [pace, setPace] = useState<PacePref | undefined>(undefined)
+  const [budget, setBudget] = useState<BudgetPref>('free_only')
 
   const [resuming, setResuming] = useState(false)
   const [resumeError, setResumeError] = useState<string | null>(null)
@@ -239,6 +245,27 @@ export default function TabTopics({
         </div>
       </div>
 
+      <div className="glass p-6">
+        <label className="block text-sm font-medium text-slate-300 mb-2">
+          What's your budget?
+        </label>
+        <p className="text-xs text-slate-500 mb-3">
+          We have thousands of world-class free courses. Pick <b>Free only</b> to hide paid ones entirely.
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {BUDGETS.map((b) => (
+            <button
+              key={b.id}
+              className={`chip flex flex-col items-start px-4 py-2 ${budget === b.id ? 'chip-active' : ''}`}
+              onClick={() => setBudget(b.id)}
+            >
+              <span className="font-semibold">{b.label}</span>
+              <span className="text-xs text-slate-400 font-normal">{b.hint}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex justify-end">
         <button
           className="btn-primary flex items-center gap-2"
@@ -251,6 +278,7 @@ export default function TabTopics({
               goal,
               preferred_formats: formats,
               pace,
+              budget,
             })
           }
         >

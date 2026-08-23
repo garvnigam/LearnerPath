@@ -6,6 +6,9 @@ FormatPref = Literal["video", "text", "hands-on"]
 PacePref = Literal["solo", "cohort", "paced"]
 
 
+BudgetPref = Literal["free_only", "free_and_paid"]
+
+
 class TopicInput(BaseModel):
     user_id: Optional[str] = None
     subjects: list[str] = Field(..., description="e.g. ['Computer Science', 'Mathematics']")
@@ -14,6 +17,7 @@ class TopicInput(BaseModel):
     goal: Optional[GoalType] = None
     preferred_formats: list[FormatPref] = []
     pace: Optional[PacePref] = None
+    budget: BudgetPref = "free_only"
 
 
 class ChatMessage(BaseModel):
@@ -82,6 +86,10 @@ class Course(BaseModel):
     image: Optional[str] = None
     topics: list[str] = []
     format: Optional[Literal["course", "playlist", "lectures"]] = "course"
+    price_type: Optional[Literal["free", "audit_free", "paid", "freemium"]] = "free"
+    price_amount: Optional[float] = None
+    price_currency: Optional[str] = "USD"
+    certificate_price: Optional[float] = None
 
 
 class WeekPlan(BaseModel):

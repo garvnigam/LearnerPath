@@ -101,24 +101,49 @@ async def tag_one(client: httpx.AsyncClient, sem: asyncio.Semaphore, row: Row) -
                 backoff = min(backoff * 2, 30)
                 continue
             if r.status_code != 200:
+                # 400 = content filter, prompt too long, etc. Mark tagged with sentinel so we skip forever.
+                if r.status_code == 400:
+                    print(f"    ~ {row.id[:8]}: HTTP 400 (content filter or bad prompt) — marking as unfilterable")
+                    return row.id, {"concepts": ["_filtered_"], "prerequisite_concepts": []}
                 if attempt >= MAX_RETRIES:
                     print(f"    ! {row.id[:8]}: HTTP {r.status_code} {r.text[:120]}")
                     return None
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, 30)
                 continue
-            content = r.json()["choices"][0]["message"]["content"]
-            data = json.loads(content)
-            concepts = [str(c).strip().lower() for c in (data.get("concepts") or []) if c]
-            prereqs = [str(c).strip().lower() for c in (data.get("prerequisite_concepts") or []) if c]
+            js = r.json()
+            content = js["choices"][0]["message"]["content"]
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError:
+                # Model returned non-JSON despite response_format. Mark tagged with empty concepts so we don't retry forever.
+                return row.id, {"concepts": ["_unparseable_"], "prerequisite_concepts": []}
+            concepts = [_clean_concept(c) for c in (data.get("concepts") or []) if c]
+            concepts = [c for c in concepts if c]
+            prereqs = [_clean_concept(c) for c in (data.get("prerequisite_concepts") or []) if c]
+            prereqs = [c for c in prereqs if c]
+            # If model returned nothing usable, still mark it done so we don't loop.
+            if not concepts:
+                concepts = ["_unparseable_"]
             return row.id, {"concepts": concepts[:8], "prerequisite_concepts": prereqs[:5]}
-        except (httpx.HTTPError, json.JSONDecodeError, KeyError) as e:
+        except (httpx.HTTPError, KeyError) as e:
             if attempt >= MAX_RETRIES:
                 print(f"    ! {row.id[:8]}: {type(e).__name__} {str(e)[:120]}")
                 return None
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30)
     return None
+
+
+def _clean_concept(c) -> str:
+    """Sanitize an LLM-returned concept: strip nulls, trim, lowercase."""
+    if c is None:
+        return ""
+    s = str(c)
+    # Postgres text can't contain NUL bytes. Also strip control chars.
+    s = s.replace("\x00", "")
+    s = "".join(ch for ch in s if ord(ch) >= 32 or ch in "\t\n")
+    return s.strip().lower()
 
 
 async def process_batch(rows: list[Row]) -> list[tuple[str, dict]]:

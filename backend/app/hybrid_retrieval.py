@@ -22,12 +22,18 @@ async def fetch_db(
     subjects: list[str],
     focus: list[str],
     level: str,
-    budget: str = "prefer_free",
+    budget: str = "free_only",
     limit: int = 40,
     concepts: list[str] | None = None,
     max_hours: float | None = None,
     language: str = "en",
 ) -> list[dict]:
+    """Fetch candidates from the unified `courses` table.
+
+    budget:
+        "free_only"     -> only free / audit_free courses
+        "free_and_paid" -> both free and paid courses
+    """
     sb = get_supabase()
     if not sb:
         return []
@@ -35,7 +41,11 @@ async def fetch_db(
     if not topics:
         return []
 
-    price_types = ["free", "audit_free"] if budget == "free_only" else ["free", "audit_free", "paid", "freemium"]
+    price_types = (
+        ["free", "audit_free"]
+        if budget == "free_only"
+        else ["free", "audit_free", "paid", "freemium"]
+    )
     params = {
         "q_topics": topics,
         "q_concepts": concepts or [],
@@ -46,25 +56,20 @@ async def fetch_db(
         "max_count": limit,
     }
 
+    rows: list[dict] = []
     try:
-        # Preferred: single-query RPC on the unified `courses` table
         res = sb.rpc("match_courses", params).execute()
         rows = res.data or []
-        if rows:
-            return rows
     except Exception as e:
         print(f"[hybrid] match_courses RPC failed, falling back to table select: {e}")
+        try:
+            q = sb.table("courses").select("*")
+            q = q.overlaps("topics", topics).in_("level", _nearby_levels(level)).in_("price_type", price_types)
+            rows = q.limit(limit).execute().data or []
+        except Exception as e2:
+            print(f"[hybrid] fallback failed: {e2}")
 
-    # Fallback: legacy harvard_pll_courses table
-    try:
-        q = sb.table("harvard_pll_courses").select("*")
-        q = q.overlaps("topics", topics).in_("level", _nearby_levels(level))
-        if budget == "free_only":
-            q = q.eq("price_type", "free")
-        return q.limit(limit).execute().data or []
-    except Exception as e:
-        print(f"[hybrid] db fetch failed: {e}")
-        return []
+    return rows[:limit]
 
 
 def _nearby_levels(level: str) -> list[str]:
@@ -136,23 +141,18 @@ async def gather_candidates(
     subjects: list[str],
     focus: list[str],
     level: str,
-    budget: str = "prefer_free",
+    budget: str = "free_only",
     total_target: int = 40,
     allow_llm_fallback: bool = True,
     level_by_subject: dict[str, str] | None = None,
 ) -> list[dict]:
     """Run all sources in parallel per-subject, dedupe, and optionally fill with LLM extras.
 
-    If `level_by_subject` is provided, one retrieval pass is fired for EACH subject
-    at that subject's own level (so a learner who is advanced in ML but beginner in
-    cybersecurity gets courses that fit each subject individually).
+    budget: "free_only" or "free_and_paid".
     """
     level_by_subject = level_by_subject or {s: level for s in subjects}
 
     tasks: list[Awaitable[list[dict]]] = []
-    # One (db + curated) pass per subject at that subject's own level.
-    # MIT/Harvard/MS/NUS/YouTube/FCC are all in the unified `courses` table already,
-    # so the DB query covers them via `match_courses` RPC.
     per_subject_limit = max(6, total_target // max(1, len(subjects)))
     for subj in subjects:
         subj_level = level_by_subject.get(subj, level)
