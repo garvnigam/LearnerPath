@@ -115,28 +115,39 @@ def upsert_embeddings(supabase, updates: list[tuple[str, list[float]]]) -> int:
 
 
 def fetch_rows(supabase, refresh: bool, limit: int | None) -> list[Row]:
+    """Fetch rows missing an embedding. Deduplicates by id to survive
+    concurrent updates shifting page boundaries.
+    """
     all_rows: list[Row] = []
+    seen_ids: set[str] = set()
     page = 0
-    page_size = 500
+    page_size = 1000
 
     while True:
         q = supabase.table("courses").select(
             "id,title,description,topics,concepts,subjects,embedding"
         )
-        q = q.range(page * page_size, (page + 1) * page_size - 1)
+        if not refresh:
+            q = q.is_("embedding", "null")
+        q = q.order("id").range(page * page_size, (page + 1) * page_size - 1)
         data = q.execute().data or []
         if not data:
             break
+        added = 0
         for d in data:
+            if d["id"] in seen_ids:
+                continue
+            seen_ids.add(d["id"])
             if not refresh and d.get("embedding") is not None:
                 continue
             text = build_text(d)
             if not text.strip():
                 continue
             all_rows.append(Row(id=d["id"], text=text))
+            added += 1
             if limit and len(all_rows) >= limit:
                 return all_rows
-        if len(data) < page_size:
+        if added == 0 or len(data) < page_size:
             break
         page += 1
     return all_rows
