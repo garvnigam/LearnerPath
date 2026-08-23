@@ -178,17 +178,24 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
     wrong_topics = []
     right_topics = []
     per_subject_counts: dict[str, list[int]] = {}  # subject -> [correct, total]
+    # Concepts the learner demonstrated (correct) vs missed (wrong).
+    # Missed concepts drive retrieval — those are the actual skill gaps.
+    demonstrated_concepts: set[str] = set()
+    missed_concepts_by_subject: dict[str, set[str]] = {}
     for q in req.questions:
         picked = req.answers.get(q.id)
         subj = q.subject or (req.topic_input.subjects[0] if req.topic_input.subjects else "general")
         counts = per_subject_counts.setdefault(subj, [0, 0])
         counts[1] += 1
+        q_concepts = [c.strip().lower() for c in (q.concepts or []) if c and c.strip()]
         if picked == q.correct:
             correct_count += 1
             counts[0] += 1
             right_topics.append(q.question[:80])
+            demonstrated_concepts.update(q_concepts)
         else:
             wrong_topics.append(f"Q{q.id} ({q.difficulty}, {subj}): {q.question[:80]}")
+            missed_concepts_by_subject.setdefault(subj, set()).update(q_concepts)
 
     def level_from_ratio(correct: int, total: int) -> str:
         ratio = correct / total if total else 0
@@ -206,6 +213,8 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
 
     # gather candidate courses from DB + live APIs + curated + optional LLM fallback,
     # querying PER SUBJECT at that subject's own level so the pool reflects each subject's ceiling.
+    # Also pass the concepts the learner MISSED — retrieval boosts courses that teach those.
+    gap_concepts_by_subject = {s: list(c) for s, c in missed_concepts_by_subject.items()}
     candidates = await gather_candidates(
         subjects=req.topic_input.subjects,
         focus=req.focus_areas,
@@ -214,20 +223,34 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
         total_target=40,
         allow_llm_fallback=True,
         level_by_subject=provisional_by_subject,
+        gap_concepts_by_subject=gap_concepts_by_subject,
+        demonstrated_concepts=list(demonstrated_concepts),
     )
 
     fmt_pref = ', '.join(req.topic_input.preferred_formats) or 'no preference'
     pace_pref = req.topic_input.pace or 'no preference'
 
-    candidate_lines = [
-        f"- [{c['level']}] ({c.get('format','course')}, {c.get('price_type','free')}) {c['title']} — {c['provider']} -> {c['url']}"
-        for c in candidates
-    ]
+    candidate_lines = []
+    for c in candidates:
+        cps = c.get("concepts") or []
+        cps_str = f"  concepts: {', '.join(cps[:6])}" if cps else ""
+        candidate_lines.append(
+            f"- [{c['level']}] ({c.get('format','course')}, {c.get('price_type','free')}) "
+            f"{c['title']} — {c['provider']} -> {c['url']}{cps_str}"
+        )
 
     subject_level_lines = "\n".join(
         f"  - {subj}: {c}/{t} correct -> provisional {provisional_by_subject[subj]}"
         for subj, (c, t) in per_subject_counts.items()
     )
+
+    # Concise per-subject skill gaps derived from the quiz's wrong-answer concepts.
+    gap_concept_lines = "\n".join(
+        f"  - {subj}: {', '.join(sorted(concepts))}"
+        for subj, concepts in missed_concepts_by_subject.items()
+        if concepts
+    ) or "  (none identified)"
+    demonstrated_line = ", ".join(sorted(demonstrated_concepts)[:20]) or "(none)"
 
     prompt = f"""Learner:
 - Subjects: {', '.join(req.topic_input.subjects)}
@@ -241,6 +264,13 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
 Quiz: {correct_count}/{len(req.questions)} correct overall.
 Per-subject provisional level:
 {subject_level_lines}
+
+Skill GAPS the learner demonstrably has (from wrong answers, use these to target course selection):
+{gap_concept_lines}
+
+Concepts the learner already knows (from correct answers — do NOT waste weeks re-teaching these):
+{demonstrated_line}
+
 Correct topics: {right_topics[:5]}
 Wrong topics: {wrong_topics[:5]}
 

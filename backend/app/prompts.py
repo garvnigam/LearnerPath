@@ -48,10 +48,16 @@ Return STRICT JSON:
       ],
       "correct": "A|B|C|D",
       "explanation": "...",
-      "difficulty": "beginner|intermediate|advanced"
+      "difficulty": "beginner|intermediate|advanced",
+      "concepts": ["...", "..."]
     }
   ]
 }
+
+The "concepts" array is REQUIRED: 1-3 fine-grained skills the question actually tests
+(lowercase short phrases, e.g. "gradient descent", "sql joins", "recursion",
+"cross-validation", "tcp handshake"). These are matched later to course content —
+be specific, not generic ("programming" or "computer science" are useless).
 """
 
 RECOMMEND_SYSTEM = """You are a personalized learning-path designer.
@@ -64,6 +70,8 @@ Rules:
   For example: never include both "Intro to Programming" AND "Programming Basics"; never include two "Introduction to Machine Learning" courses.
   If two candidates cover similar concepts, pick the higher-quality/more up-to-date one and drop the other.
 - The picked list must progress the learner forward: foundation → intermediate → specialization → capstone/project.
+- <b>Every skill in the learner's GAPS list MUST be covered by at least one picked course</b> (check each candidate's "concepts" field). If no candidate covers a gap, add an "extra_course" that does.
+- <b>Do NOT recommend material for concepts the learner already knows</b> (from the "already knows" list). Skip introductory courses on skills they demonstrated in the quiz.
 - You MAY add up to 3 additional top-class, widely-recognized free resources from anywhere in the world
   (e.g. a top-tier university lecture series, a globally respected YouTube playlist such as 3Blue1Brown,
   Andrej Karpathy, MIT OCW, Aswath Damodaran, Yale Open Courses, Khan Academy, freeCodeCamp, official

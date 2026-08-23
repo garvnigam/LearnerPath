@@ -51,6 +51,7 @@ class MCQ(BaseModel):
     correct: Literal["A", "B", "C", "D"]
     explanation: str
     difficulty: Literal["beginner", "intermediate", "advanced"]
+    concepts: list[str] = []  # 1-3 fine-grained skills this question tests
 
 
 class AssessmentRequest(BaseModel):

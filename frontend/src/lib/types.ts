@@ -31,6 +31,7 @@ export type MCQ = {
   correct: 'A' | 'B' | 'C' | 'D'
   explanation: string
   difficulty: 'beginner' | 'intermediate' | 'advanced'
+  concepts?: string[]
 }
 
 export type Course = {

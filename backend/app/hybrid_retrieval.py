@@ -145,19 +145,33 @@ async def gather_candidates(
     total_target: int = 40,
     allow_llm_fallback: bool = True,
     level_by_subject: dict[str, str] | None = None,
+    gap_concepts_by_subject: dict[str, list[str]] | None = None,
+    demonstrated_concepts: list[str] | None = None,
 ) -> list[dict]:
     """Run all sources in parallel per-subject, dedupe, and optionally fill with LLM extras.
 
     budget: "free_only" or "free_and_paid".
+    gap_concepts_by_subject: concepts the learner MISSED per subject. Retrieval boosts
+        courses whose `concepts` array overlaps these (SQL: `c.concepts && q_concepts`,
+        with a +2 boost over topic match).
+    demonstrated_concepts: concepts the learner ANSWERED CORRECTLY (currently unused
+        at retrieval time; useful for future prerequisite pruning).
     """
     level_by_subject = level_by_subject or {s: level for s in subjects}
+    gap_concepts_by_subject = gap_concepts_by_subject or {}
 
     tasks: list[Awaitable[list[dict]]] = []
     per_subject_limit = max(6, total_target // max(1, len(subjects)))
     for subj in subjects:
         subj_level = level_by_subject.get(subj, level)
+        subj_gap_concepts = gap_concepts_by_subject.get(subj, [])
         tasks.extend([
-            fetch_db([subj], focus, subj_level, budget=budget, limit=per_subject_limit),
+            fetch_db(
+                [subj], focus, subj_level,
+                budget=budget,
+                limit=per_subject_limit,
+                concepts=subj_gap_concepts,
+            ),
             fetch_curated([subj], focus, subj_level, limit=max(4, per_subject_limit // 2)),
         ])
 
