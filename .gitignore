@@ -20,3 +20,4 @@ learnerpath-api.PublishSettings
 harvard_pll_courses.json
 scripts/.harvard_pll_checkpoint.json
 scripts/harvard_pll_courses.json
+**/__pycache__/

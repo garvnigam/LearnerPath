@@ -1,19 +1,22 @@
 """Hybrid course retrieval:
-1. Query internal DB (Supabase `courses` table — 25k+ rows across MIT, Harvard, MS Learn, NUS, freeCodeCamp, YouTube).
+1. Query internal DB with two complementary strategies:
+     - keyword/concept match  (`match_courses` RPC)
+     - semantic similarity    (`search_courses_semantic` RPC on HNSW-indexed embeddings)
 2. Query local curated catalog as a safety net.
 3. Optionally ask the LLM to propose extras with a web search tool.
 4. Dedupe, score, return top-K to the ranker/planner.
 
-MIT Learn API is NOT called live anymore — those 3,041 rows are already persisted
-in the unified `courses` table via `scripts/sources/ingest_mit_learn.py`. Re-run
-that script weekly (via GitHub Actions cron) to stay fresh.
+Semantic + keyword together catch both paraphrases (semantic) and precise
+skill matches (keyword). Deduped by URL. Concept-overlap dedup collapses
+near-duplicate topics before the LLM sees them.
 """
 from __future__ import annotations
 
 import asyncio
-from typing import Callable, Awaitable
+from typing import Awaitable
 
-from .catalog import CURATED, filter_catalog
+from .azure_client import embed_text
+from .catalog import filter_catalog
 from .supabase_client import get_supabase
 
 
@@ -80,7 +83,62 @@ def _nearby_levels(level: str) -> list[str]:
     return order[max(0, i-1): min(3, i+2)]
 
 
-# ------------- Source: local curated catalog -------------
+def _semantic_query_text(subject: str, focus: list[str], gap_concepts: list[str]) -> str:
+    """Build the text we embed for semantic search.
+
+    Format matches how course rows are embedded (title + description + topics + concepts),
+    so cosine similarity picks up courses that teach exactly these gaps within this subject.
+    """
+    parts = [subject]
+    if focus:
+        parts.append("focus on " + ", ".join(focus[:6]))
+    if gap_concepts:
+        parts.append("skills to learn: " + ", ".join(gap_concepts[:8]))
+    return ". ".join(parts)
+
+
+# ------------- Source: internal DB semantic search (HNSW on embedding column) -------------
+async def fetch_semantic(
+    query_embedding: list[float] | None,
+    level: str,
+    budget: str = "free_only",
+    limit: int = 20,
+    max_hours: float | None = None,
+    language: str = "en",
+) -> list[dict]:
+    """Semantic top-K via `search_courses_semantic` RPC.
+
+    Returns rows ordered by cosine similarity to `query_embedding`, filtered by
+    level / price / language. Complementary to `fetch_db` (keyword) — captures
+    paraphrased or niche queries that exact topic-overlap would miss.
+    """
+    if not query_embedding:
+        return []
+    sb = get_supabase()
+    if not sb:
+        return []
+
+    price_types = (
+        ["free", "audit_free"]
+        if budget == "free_only"
+        else ["free", "audit_free", "paid", "freemium"]
+    )
+    params = {
+        "q_embedding": query_embedding,
+        "level_in": _nearby_levels(level),
+        "price_types": price_types,
+        "language_in": [language, "en"],
+        "max_hours": max_hours,
+        "match_count": limit,
+    }
+    try:
+        r = sb.rpc("search_courses_semantic", params).execute()
+        return r.data or []
+    except Exception as e:
+        print(f"[hybrid] semantic RPC failed: {e}")
+        return []
+
+
 async def fetch_curated(subjects: list[str], focus: list[str], level: str, limit: int = 20) -> list[dict]:
     return filter_catalog(subjects + focus, level)[:limit]
 
@@ -128,13 +186,7 @@ async def fetch_llm_extras(subjects: list[str], focus: list[str], level: str, ne
         await asyncio.gather(*[_check(p) for p in proposals if p.get("url")])
     return validated
 
-
 # ------------- Orchestrator -------------
-
-SOURCES: list[tuple[str, Callable[..., Awaitable[list[dict]]]]] = [
-    ("db",       fetch_db),
-    ("curated",  fetch_curated),
-]
 
 
 async def gather_candidates(
@@ -160,17 +212,41 @@ async def gather_candidates(
     level_by_subject = level_by_subject or {s: level for s in subjects}
     gap_concepts_by_subject = gap_concepts_by_subject or {}
 
+    # Embed one query text per subject (subject + focus + that subject's gap concepts).
+    # Fires all embeddings in parallel; each one becomes a semantic search below.
+    subject_embed_tasks = [
+        embed_text(
+            _semantic_query_text(subj, focus, gap_concepts_by_subject.get(subj, []))
+        )
+        for subj in subjects
+    ]
+    subject_embeddings = await asyncio.gather(*subject_embed_tasks, return_exceptions=True)
+    subject_embeddings_by_name: dict[str, list[float] | None] = {}
+    for subj, emb in zip(subjects, subject_embeddings):
+        if isinstance(emb, Exception) or not emb:
+            print(f"[hybrid] embedding failed for '{subj}': {emb}")
+            subject_embeddings_by_name[subj] = None
+        else:
+            subject_embeddings_by_name[subj] = emb
+
     tasks: list[Awaitable[list[dict]]] = []
     per_subject_limit = max(6, total_target // max(1, len(subjects)))
     for subj in subjects:
         subj_level = level_by_subject.get(subj, level)
         subj_gap_concepts = gap_concepts_by_subject.get(subj, [])
+        subj_emb = subject_embeddings_by_name.get(subj)
         tasks.extend([
             fetch_db(
                 [subj], focus, subj_level,
                 budget=budget,
                 limit=per_subject_limit,
                 concepts=subj_gap_concepts,
+            ),
+            fetch_semantic(
+                subj_emb,
+                subj_level,
+                budget=budget,
+                limit=per_subject_limit,
             ),
             fetch_curated([subj], focus, subj_level, limit=max(4, per_subject_limit // 2)),
         ])

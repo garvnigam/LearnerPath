@@ -17,7 +17,6 @@ from .azure_client import chat_json
 from .prompts import CHAT_SYSTEM, ASSESSMENT_SYSTEM, RECOMMEND_SYSTEM
 from .catalog import CURATED, filter_catalog
 from .hybrid_retrieval import gather_candidates
-from .mit_learn import fetch_mit_courses
 from .supabase_client import save_session, get_latest_recommendation
 from .auth import Principal, require_user
 from .quota import start_session, enforce_active_session
