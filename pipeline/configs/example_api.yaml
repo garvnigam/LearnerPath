@@ -1,0 +1,46 @@
+# Example: paginated JSON API adapter for edX Discovery-style catalogs.
+# Copy this file, edit values, then run:
+#   python pipeline/ingest_new_source.py config pipeline/configs/my_source.yaml
+#
+# See pipeline/ingest_new_source.py --help for every supported key.
+
+mode: api
+name: example_api_source          # goes into courses.source
+
+api_url: https://api.example.com/v1/courses
+items_path: results                # dotted path to the list of items in each JSON response
+paginate_style: page               # offset | page | next_url | none
+page_size: 100
+limit: 500                         # max items total (safety cap while testing)
+query_params: '{"visible": true}'  # extra query params as JSON string
+
+# Uncomment if the API uses non-default query param names:
+# page_key: page
+# limit_key: limit
+# offset_key: offset
+# next_url_path: paging.next
+
+provider: ExampleProvider          # default provider label if not mapped
+
+# Key mapping: unified courses column -> dotted path in the raw API item.
+# Lists mean "first non-null wins".
+map_title: name
+map_url: canonical_url
+map_description:
+  - long_description
+  - short_description
+map_provider: partner.name
+map_school: partner.name
+map_platform: partner.name
+map_level: difficulty
+map_topics: subjects              # list-of-dicts is auto-flattened via `.name`
+map_language: language
+map_duration_hours: duration_in_hours
+map_price_type: pricing.tier      # 'free' | 'audit_free' | 'paid'
+map_price_amount: pricing.amount
+map_image_url: image.url
+map_external_id: uuid
+
+# Set true if you only want to ingest raw rows and skip concept tagging + embeddings
+# (useful for a quick smoke test; enrich later by re-running the enrich scripts).
+skip_enrichment: false

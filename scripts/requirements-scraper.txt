@@ -1,3 +1,4 @@
-aiohttp>=3.9.0
-beautifulsoup4>=4.12.0
-lxml>=5.0.0
+# DEPRECATED — pipeline dependencies are now in backend/requirements.txt.
+# Kept only so `pip install -r scripts/requirements-scraper.txt` still works
+# for anyone with old bookmarks.
+-r ../backend/requirements.txt

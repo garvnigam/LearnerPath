@@ -8,3 +8,11 @@ openai==1.55.3
 supabase==2.9.1
 python-multipart==0.0.12
 PyJWT[crypto]==2.10.1
+
+# Ingestion pipeline (scripts/ and pipeline/) — deployed alongside backend so
+# Azure App Service and local runs share the same env.
+aiohttp>=3.9.0
+beautifulsoup4>=4.12.0
+lxml>=5.0.0
+pyyaml>=6.0
+

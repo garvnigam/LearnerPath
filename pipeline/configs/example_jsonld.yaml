@@ -1,0 +1,16 @@
+# Example: JSON-LD scraper for a university catalog site with schema.org/Course.
+# Copy this file, edit values, then run:
+#   python pipeline/ingest_new_source.py config pipeline/configs/my_source.yaml
+#
+# Works for any site whose course-detail pages have <script type="application/ld+json">
+# blocks with @type=Course (Harvard PLL, Stanford Online, Yale, freeCodeCamp, etc).
+
+mode: jsonld
+name: example_jsonld_source
+
+scrape_url: https://online.example.edu/courses
+url_pattern: /course              # <a href> substring that identifies a course link
+max_pages: 20                     # listing pagination limit
+limit: null                       # cap on individual course pages fetched (null = all)
+
+skip_enrichment: false
