@@ -1,34 +1,36 @@
 import { useEffect, useState } from 'react'
 import type { BudgetPref, FormatPref, GoalType, PacePref, SavedPlanResponse, TopicInput } from '../lib/types'
-import { Rocket, History, Loader2 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { Rocket, History, Loader2, Briefcase, Award, Wrench, Compass, GraduationCap, Video, FileText, Users, User, CalendarClock, Wallet, X, Clock, CalendarRange } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { apiGet } from '../lib/api'
 
-const SUGGESTED = [
-  'Computer Science', 'Machine Learning', 'Deep Learning', 'Data Science',
-  'Mathematics', 'Physics', 'Statistics', 'Web Development',
-  'Cybersecurity', 'Robotics', 'Economics', 'Business',
-  'Music', 'Arts', 'History', 'Philosophy', 'Psychology', 'Biology',
+const SUBJECT_EMOJI: Record<string, string> = {
+  'Computer Science': '💻', 'Machine Learning': '🤖', 'Deep Learning': '🧠', 'Data Science': '📊',
+  'Mathematics': '➗', 'Physics': '⚛️', 'Statistics': '📈', 'Web Development': '🌐',
+  'Cybersecurity': '🛡️', 'Robotics': '🦾', 'Economics': '💹', 'Business': '💼',
+  'Music': '🎵', 'Arts': '🎨', 'History': '📜', 'Philosophy': '🧭', 'Psychology': '🧩', 'Biology': '🧬',
+}
+
+const SUGGESTED = Object.keys(SUBJECT_EMOJI)
+
+const GOALS: { id: GoalType; label: string; icon: any }[] = [
+  { id: 'job', label: 'Get a job', icon: Briefcase },
+  { id: 'certification', label: 'Certification', icon: Award },
+  { id: 'project', label: 'Build a project', icon: Wrench },
+  { id: 'curiosity', label: 'Curiosity', icon: Compass },
+  { id: 'exam_prep', label: 'Exam prep', icon: GraduationCap },
 ]
 
-const GOALS: { id: GoalType; label: string }[] = [
-  { id: 'job', label: 'Get a job' },
-  { id: 'certification', label: 'Certification' },
-  { id: 'project', label: 'Build a project' },
-  { id: 'curiosity', label: 'Curiosity' },
-  { id: 'exam_prep', label: 'Exam prep' },
+const FORMATS: { id: FormatPref; label: string; icon: any }[] = [
+  { id: 'video', label: 'Video', icon: Video },
+  { id: 'text', label: 'Text', icon: FileText },
+  { id: 'hands-on', label: 'Hands-on', icon: Wrench },
 ]
 
-const FORMATS: { id: FormatPref; label: string }[] = [
-  { id: 'video', label: 'Video' },
-  { id: 'text', label: 'Text' },
-  { id: 'hands-on', label: 'Hands-on' },
-]
-
-const PACES: { id: PacePref; label: string }[] = [
-  { id: 'solo', label: 'Solo' },
-  { id: 'cohort', label: 'Cohort' },
-  { id: 'paced', label: 'Paced w/ deadlines' },
+const PACES: { id: PacePref; label: string; icon: any }[] = [
+  { id: 'solo', label: 'Solo', icon: User },
+  { id: 'cohort', label: 'Cohort', icon: Users },
+  { id: 'paced', label: 'Paced w/ deadlines', icon: CalendarClock },
 ]
 
 const container = {
@@ -119,10 +121,21 @@ export default function TabTopics({
         </motion.div>
       )}
 
-      <motion.div variants={item} className="glass p-8">
-        <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-          What do you want to learn?
-        </h2>
+      <motion.div variants={item} className="glass p-8 relative overflow-hidden">
+        <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-gradient-to-br from-amber-500/20 to-rose-500/10 blur-3xl" />
+        <div className="relative flex items-center gap-3 mb-2">
+          <motion.div
+            initial={{ scale: 0.6, opacity: 0, rotate: -15 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            transition={{ type: 'spring', stiffness: 220, damping: 16 }}
+            className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-xl shadow-lg shadow-orange-500/30 flex-shrink-0"
+          >
+            🚀
+          </motion.div>
+          <h2 className="text-3xl font-display font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+            What do you want to learn?
+          </h2>
+        </div>
         <p className="text-slate-400 mb-6">Pick one or more subjects. You can add your own too.</p>
 
         <div className="flex flex-wrap gap-2 mb-4">
@@ -132,7 +145,7 @@ export default function TabTopics({
               onClick={() => toggle(s)}
               className={`chip ${selected.includes(s) ? 'chip-active' : ''}`}
             >
-              {s}
+              <span className="mr-1">{SUBJECT_EMOJI[s]}</span>{s}
             </button>
           ))}
         </div>
@@ -148,17 +161,42 @@ export default function TabTopics({
           <button className="btn-ghost" onClick={addCustom}>Add</button>
         </div>
 
-        {selected.length > 0 && (
-          <div className="mt-4 text-sm text-slate-300">
-            <span className="text-slate-500">Selected:</span>{' '}
-            <span className="font-medium">{selected.join(', ')}</span>
-          </div>
-        )}
+        <AnimatePresence>
+          {selected.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 flex flex-wrap items-center gap-2 overflow-hidden"
+            >
+              <span className="text-xs text-slate-500">Selected:</span>
+              <AnimatePresence>
+                {selected.map((s) => (
+                  <motion.span
+                    key={s}
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    className="inline-flex items-center gap-1.5 text-xs pl-2.5 pr-1.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/30 text-amber-200"
+                  >
+                    {SUBJECT_EMOJI[s] ?? '📌'} {s}
+                    <button onClick={() => toggle(s)} className="hover:text-white transition p-0.5">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </motion.span>
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+            <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-300">
+              <CalendarRange className="w-4 h-4" />
+            </span>
             How many months to prepare?
           </label>
           <div className="flex items-center gap-4">
@@ -166,7 +204,7 @@ export default function TabTopics({
               type="range" min={1} max={24}
               value={months}
               onChange={(e) => setMonths(+e.target.value)}
-              className="flex-1 accent-indigo-500"
+              className="flex-1 accent-amber-500"
             />
             <span className="text-2xl font-bold w-16 text-right">{months}mo</span>
           </div>
@@ -180,7 +218,10 @@ export default function TabTopics({
         </div>
 
         <div className="glass p-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+            <span className="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-400/30 flex items-center justify-center text-orange-300">
+              <Clock className="w-4 h-4" />
+            </span>
             Hours per day you can study?
           </label>
           <div className="flex items-center gap-4">
@@ -188,7 +229,7 @@ export default function TabTopics({
               type="range" min={0.5} max={8} step={0.5}
               value={hours}
               onChange={(e) => setHours(+e.target.value)}
-              className="flex-1 accent-indigo-500"
+              className="flex-1 accent-orange-500"
             />
             <span className="text-2xl font-bold w-16 text-right">{hours}h</span>
           </div>
@@ -203,60 +244,84 @@ export default function TabTopics({
       </motion.div>
 
       <motion.div variants={item} className="glass p-6">
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+          <span className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-400/30 flex items-center justify-center text-rose-300">
+            <Rocket className="w-4 h-4" />
+          </span>
           What's your goal?
         </label>
         <div className="flex flex-wrap gap-2">
-          {GOALS.map((g) => (
-            <button
-              key={g.id}
-              className={`chip ${goal === g.id ? 'chip-active' : ''}`}
-              onClick={() => setGoal((cur) => (cur === g.id ? undefined : g.id))}
-            >
-              {g.label}
-            </button>
-          ))}
+          {GOALS.map((g) => {
+            const GoalIcon = g.icon
+            return (
+              <button
+                key={g.id}
+                className={`chip flex items-center gap-1.5 ${goal === g.id ? 'chip-active' : ''}`}
+                onClick={() => setGoal((cur) => (cur === g.id ? undefined : g.id))}
+              >
+                <GoalIcon className="w-3.5 h-3.5" />
+                {g.label}
+              </button>
+            )
+          })}
         </div>
       </motion.div>
 
       <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+            <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-300">
+              <Video className="w-4 h-4" />
+            </span>
             Prefer video, text, or hands-on? <span className="text-slate-500 font-normal">(pick any)</span>
           </label>
           <div className="flex flex-wrap gap-2">
-            {FORMATS.map((f) => (
-              <button
-                key={f.id}
-                className={`chip ${formats.includes(f.id) ? 'chip-active' : ''}`}
-                onClick={() => toggleFormat(f.id)}
-              >
-                {f.label}
-              </button>
-            ))}
+            {FORMATS.map((f) => {
+              const FormatIcon = f.icon
+              return (
+                <button
+                  key={f.id}
+                  className={`chip flex items-center gap-1.5 ${formats.includes(f.id) ? 'chip-active' : ''}`}
+                  onClick={() => toggleFormat(f.id)}
+                >
+                  <FormatIcon className="w-3.5 h-3.5" />
+                  {f.label}
+                </button>
+              )
+            })}
           </div>
         </div>
 
         <div className="glass p-6">
-          <label className="block text-sm font-medium text-slate-300 mb-2">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
+            <span className="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-400/30 flex items-center justify-center text-orange-300">
+              <Users className="w-4 h-4" />
+            </span>
             Solo, cohort, or paced with deadlines?
           </label>
           <div className="flex flex-wrap gap-2">
-            {PACES.map((p) => (
-              <button
-                key={p.id}
-                className={`chip ${pace === p.id ? 'chip-active' : ''}`}
-                onClick={() => setPace((cur) => (cur === p.id ? undefined : p.id))}
-              >
-                {p.label}
-              </button>
-            ))}
+            {PACES.map((p) => {
+              const PaceIcon = p.icon
+              return (
+                <button
+                  key={p.id}
+                  className={`chip flex items-center gap-1.5 ${pace === p.id ? 'chip-active' : ''}`}
+                  onClick={() => setPace((cur) => (cur === p.id ? undefined : p.id))}
+                >
+                  <PaceIcon className="w-3.5 h-3.5" />
+                  {p.label}
+                </button>
+              )
+            })}
           </div>
         </div>
       </motion.div>
 
       <motion.div variants={item} className="glass p-6">
-        <label className="block text-sm font-medium text-slate-300 mb-2">
+        <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
+          <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+            <Wallet className="w-4 h-4" />
+          </span>
           What's your budget?
         </label>
         <p className="text-xs text-slate-500 mb-3">

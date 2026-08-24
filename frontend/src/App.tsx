@@ -15,8 +15,8 @@ import { GraduationCap, MessageSquare, ListChecks, Sparkles, Clock } from 'lucid
 type Stage = 'topics' | 'chat' | 'assessment' | 'results'
 
 const STAGE_ACCENT: Record<Stage, { gradient: string; orbs: [string, string, string] }> = {
-  topics: { gradient: 'from-indigo-500 via-purple-500 to-pink-500', orbs: ['bg-indigo-500/25', 'bg-fuchsia-500/20', 'bg-purple-500/15'] },
-  chat: { gradient: 'from-sky-500 via-blue-500 to-indigo-500', orbs: ['bg-sky-500/25', 'bg-blue-500/20', 'bg-cyan-400/15'] },
+  topics: { gradient: 'from-amber-500 via-orange-500 to-rose-500', orbs: ['bg-amber-500/25', 'bg-orange-500/20', 'bg-rose-500/15'] },
+  chat: { gradient: 'from-emerald-500 via-teal-500 to-cyan-500', orbs: ['bg-emerald-500/25', 'bg-teal-500/20', 'bg-cyan-500/15'] },
   assessment: { gradient: 'from-amber-500 via-orange-500 to-rose-500', orbs: ['bg-amber-500/25', 'bg-orange-500/20', 'bg-rose-500/15'] },
   results: { gradient: 'from-emerald-500 via-teal-500 to-cyan-500', orbs: ['bg-emerald-500/25', 'bg-teal-500/20', 'bg-cyan-500/15'] },
 }

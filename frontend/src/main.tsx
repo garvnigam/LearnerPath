@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { MsalProvider } from '@azure/msal-react'
 import { EventType } from '@azure/msal-browser'
 import App from './App'
+import EduBackground from './components/EduBackground'
 import './index.css'
 import { msalInstance, entraConfigured } from './lib/authConfig'
 
@@ -21,6 +22,7 @@ async function bootstrap() {
 
   ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
+      <EduBackground />
       <MsalProvider instance={msalInstance}>
         <App />
       </MsalProvider>

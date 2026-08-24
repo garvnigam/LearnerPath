@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { MCQ, RecommendationResponse, TopicInput } from '../lib/types'
 import { apiPost } from '../lib/api'
-import { Loader2, CheckCircle2, ArrowRight } from 'lucide-react'
+import { CheckCircle2, ArrowRight, Brain, ListChecks, Sparkles, Target } from 'lucide-react'
 import { motion } from 'framer-motion'
+import LoadingScene from './LoadingScene'
 
 type Props = {
   userId: string | null
@@ -96,11 +97,48 @@ export default function TabAssessment({
 
   if (loading) {
     return (
-      <div className="glass p-16 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
-        <p className="text-slate-300">Generating your personalized quiz…</p>
-        <p className="text-xs text-slate-500">Focus areas: {focusAreas.join(', ') || '—'}</p>
-      </div>
+      <LoadingScene
+        title="Building your quiz"
+        accent="from-amber-500 to-orange-600"
+        icons={[Brain, ListChecks, Target, Sparkles]}
+        messages={[
+          `Reviewing focus areas: ${focusAreas.join(', ') || topicInput.subjects.join(', ')}…`,
+          'Writing questions that probe real understanding, not trivia…',
+          'Calibrating difficulty across beginner to advanced…',
+          'Almost ready — final quality pass…',
+        ]}
+      />
+    )
+  }
+
+  if (advancing) {
+    return (
+      <LoadingScene
+        title="Tuning round 2"
+        accent="from-amber-500 to-orange-600"
+        icons={[Brain, Target, Sparkles]}
+        messages={[
+          'Scoring your round 1 answers…',
+          'Finding the edge of what you know…',
+          'Generating targeted follow-up questions…',
+        ]}
+      />
+    )
+  }
+
+  if (submitting) {
+    return (
+      <LoadingScene
+        title="Building your learning path"
+        accent="from-emerald-500 to-teal-600"
+        icons={[Brain, Target, ListChecks, Sparkles]}
+        messages={[
+          'Scoring every answer against difficulty and topic…',
+          'Determining your level per subject…',
+          'Matching courses from MIT, Stanford, Harvard, IITs…',
+          'Assembling your week-by-week study plan…',
+        ]}
+      />
     )
   }
 
@@ -185,12 +223,12 @@ export default function TabAssessment({
 
       <div className="flex justify-end sticky bottom-4">
         {round === 1 ? (
-          <button className="btn-primary flex items-center gap-2" disabled={!canAdvance || advancing} onClick={advanceToRound2}>
-            {advancing ? (<><Loader2 className="w-4 h-4 animate-spin" /> Tuning next questions…</>) : (<>Next 5 questions <ArrowRight className="w-4 h-4" /></>)}
+          <button className="btn-primary flex items-center gap-2" disabled={!canAdvance} onClick={advanceToRound2}>
+            Next 5 questions <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
-          <button className="btn-primary" disabled={!canSubmit || submitting} onClick={submit}>
-            {submitting ? (<><Loader2 className="w-4 h-4 animate-spin inline mr-2" /> Analyzing…</>) : 'Submit & get my path'}
+          <button className="btn-primary" disabled={!canSubmit} onClick={submit}>
+            Submit & get my path
           </button>
         )}
       </div>
