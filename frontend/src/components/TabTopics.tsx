@@ -31,6 +31,15 @@ const PACES: { id: PacePref; label: string }[] = [
   { id: 'paced', label: 'Paced w/ deadlines' },
 ]
 
+const container = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+}
+const item = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0 },
+}
+
 const BUDGETS: { id: BudgetPref; label: string; hint: string }[] = [
   { id: 'strictly_free',  label: 'Strictly free',        hint: 'Only 100% free courses. No Coursera audit-only paid certs.' },
   { id: 'free_and_audit', label: 'Free + audit-only',    hint: 'Include Coursera courses you can watch free (cert costs money).' },
@@ -94,9 +103,9 @@ export default function TabTopics({
   const valid = selected.length > 0 && months > 0 && hours > 0
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {userId && (
-        <div className="glass p-4 flex items-center justify-between gap-4">
+        <motion.div variants={item} className="glass p-4 flex items-center justify-between gap-4">
           <div className="text-sm text-slate-300">
             Already have a plan? Pick up right where you left off.
           </div>
@@ -107,10 +116,10 @@ export default function TabTopics({
               Continue my plan
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
 
-      <div className="glass p-8">
+      <motion.div variants={item} className="glass p-8">
         <h2 className="text-3xl font-bold mb-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
           What do you want to learn?
         </h2>
@@ -145,9 +154,9 @@ export default function TabTopics({
             <span className="font-medium">{selected.join(', ')}</span>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
           <label className="block text-sm font-medium text-slate-300 mb-2">
             How many months to prepare?
@@ -191,9 +200,9 @@ export default function TabTopics({
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="glass p-6">
+      <motion.div variants={item} className="glass p-6">
         <label className="block text-sm font-medium text-slate-300 mb-2">
           What's your goal?
         </label>
@@ -208,9 +217,9 @@ export default function TabTopics({
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
           <label className="block text-sm font-medium text-slate-300 mb-2">
             Prefer video, text, or hands-on? <span className="text-slate-500 font-normal">(pick any)</span>
@@ -244,9 +253,9 @@ export default function TabTopics({
             ))}
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="glass p-6">
+      <motion.div variants={item} className="glass p-6">
         <label className="block text-sm font-medium text-slate-300 mb-2">
           What's your budget?
         </label>
@@ -265,9 +274,9 @@ export default function TabTopics({
             </button>
           ))}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="flex justify-end">
+      <motion.div variants={item} className="flex justify-end">
         <button
           className="btn-primary flex items-center gap-2"
           disabled={!valid}
@@ -285,7 +294,7 @@ export default function TabTopics({
         >
           Continue <Rocket className="w-4 h-4" />
         </button>
-      </div>
+      </motion.div>
     </motion.div>
   )
 }

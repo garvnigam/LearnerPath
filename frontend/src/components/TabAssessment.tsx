@@ -97,7 +97,7 @@ export default function TabAssessment({
   if (loading) {
     return (
       <div className="glass p-16 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
         <p className="text-slate-300">Generating your personalized quiz…</p>
         <p className="text-xs text-slate-500">Focus areas: {focusAreas.join(', ') || '—'}</p>
       </div>
@@ -127,7 +127,7 @@ export default function TabAssessment({
           </div>
           <div className="w-32 h-2 rounded-full bg-white/10 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all"
+              className="h-full bg-gradient-to-r from-amber-500 to-orange-600 transition-all"
               style={{
                 width: `${((round === 1 ? roundOneAnswered : answered) / Math.max(1, round === 1 ? roundOneQuestions.length : questions.length)) * 100}%`,
               }}
@@ -139,7 +139,7 @@ export default function TabAssessment({
       {visibleQuestions.map((q, i) => (
         <motion.div key={q.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }} className="glass p-6">
           <div className="flex items-start gap-3 mb-4">
-            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-sm font-bold flex-shrink-0">
+            <span className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-sm font-bold flex-shrink-0">
               {q.id}
             </span>
             <div className="flex-1">
@@ -149,7 +149,7 @@ export default function TabAssessment({
                   {q.difficulty}
                 </span>
                 {q.subject && (
-                  <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-400/20 text-indigo-300">
+                  <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-400/20 text-amber-300">
                     {q.subject}
                   </span>
                 )}
@@ -161,20 +161,22 @@ export default function TabAssessment({
             {q.options.map((o) => {
               const active = answers[q.id] === o.key
               return (
-                <button
+                <motion.button
                   key={o.key}
+                  whileHover={{ scale: 1.015 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={() => setAnswers({ ...answers, [q.id]: o.key })}
                   className={`text-left px-4 py-3 rounded-xl border transition flex items-start gap-3
                     ${active
-                      ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border-indigo-400'
+                      ? 'bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-amber-400'
                       : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
                 >
-                  <span className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0
-                    ${active ? 'bg-indigo-500 text-white' : 'bg-white/10 text-slate-300'}`}>
+                  <span className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 transition
+                    ${active ? 'bg-amber-500 text-white' : 'bg-white/10 text-slate-300'}`}>
                     {active ? <CheckCircle2 className="w-4 h-4" /> : o.key}
                   </span>
                   <span className="text-sm">{o.text}</span>
-                </button>
+                </motion.button>
               )
             })}
           </div>

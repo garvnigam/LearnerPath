@@ -16,15 +16,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6">
+    <div className="min-h-screen flex items-center justify-center px-6 relative overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute -top-20 -left-16 w-[32rem] h-[32rem] rounded-full bg-indigo-500/20 blur-3xl animate-float-slow" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[28rem] h-[28rem] rounded-full bg-pink-500/15 blur-3xl animate-float" />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="glass p-8 max-w-md w-full text-center"
       >
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-3xl">
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 14 }}
+          className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 mx-auto mb-6 flex items-center justify-center text-3xl shadow-lg shadow-indigo-500/30"
+        >
           🎓
-        </div>
+        </motion.div>
         <h1 className="text-2xl font-bold mb-2">Welcome to LearnPath</h1>
         <p className="text-sm text-slate-400 mb-8">
           Personalized learning paths from top universities. Sign in with your email to get started.

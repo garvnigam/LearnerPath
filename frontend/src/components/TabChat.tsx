@@ -76,7 +76,7 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass p-6 min-h-[560px] flex flex-col">
       <div className="flex items-center gap-2 mb-4 pb-4 border-b border-white/10">
-        <Sparkles className="w-5 h-5 text-purple-400" />
+        <Sparkles className="w-5 h-5 text-sky-400" />
         <h2 className="text-lg font-semibold">Let's narrow it down</h2>
         <span className="ml-auto text-xs text-slate-400">
           {topicInput.subjects.join(' • ')} · {topicInput.duration_months}mo · {topicInput.hours_per_day}h/day
@@ -93,13 +93,13 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
               className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {m.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center flex-shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
               )}
               <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed
                 ${m.role === 'user'
-                  ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-br-sm'
+                  ? 'bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-br-sm'
                   : 'bg-white/5 border border-white/10 rounded-bl-sm'}`}
               >
                 {m.content}
@@ -114,7 +114,7 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
         </AnimatePresence>
         {loading && (
           <div className="flex gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center">
               <Bot className="w-4 h-4" />
             </div>
             <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl rounded-bl-sm">
@@ -140,9 +140,15 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
           onKeyDown={(e) => e.key === 'Enter' && send()}
           disabled={loading}
         />
-        <button className="btn-primary" onClick={send} disabled={loading || !input.trim()}>
+        <motion.button
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="btn-primary"
+          onClick={send}
+          disabled={loading || !input.trim()}
+        >
           <Send className="w-4 h-4" />
-        </button>
+        </motion.button>
       </div>
     </motion.div>
   )

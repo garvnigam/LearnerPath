@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useMsal, useIsAuthenticated } from '@azure/msal-react'
 import type { TopicInput, ChatMessage, RecommendationResponse, MCQ, SavedPlanResponse } from './lib/types'
 import { entraConfigured } from './lib/authConfig'
@@ -12,6 +13,13 @@ import LoginPage from './components/LoginPage'
 import { GraduationCap, MessageSquare, ListChecks, Sparkles, Clock } from 'lucide-react'
 
 type Stage = 'topics' | 'chat' | 'assessment' | 'results'
+
+const STAGE_ACCENT: Record<Stage, { gradient: string; orbs: [string, string, string] }> = {
+  topics: { gradient: 'from-indigo-500 via-purple-500 to-pink-500', orbs: ['bg-indigo-500/25', 'bg-fuchsia-500/20', 'bg-purple-500/15'] },
+  chat: { gradient: 'from-sky-500 via-blue-500 to-indigo-500', orbs: ['bg-sky-500/25', 'bg-blue-500/20', 'bg-cyan-400/15'] },
+  assessment: { gradient: 'from-amber-500 via-orange-500 to-rose-500', orbs: ['bg-amber-500/25', 'bg-orange-500/20', 'bg-rose-500/15'] },
+  results: { gradient: 'from-emerald-500 via-teal-500 to-cyan-500', orbs: ['bg-emerald-500/25', 'bg-teal-500/20', 'bg-cyan-500/15'] },
+}
 
 export default function App() {
   const { instance, accounts } = useMsal()
@@ -92,16 +100,36 @@ export default function App() {
     { id: 'results', label: 'Your path', icon: Sparkles },
   ]
 
+  const accent = STAGE_ACCENT[stage]
+
   return (
-    <div className="min-h-screen">
-      <header className="border-b border-white/5 backdrop-blur-md sticky top-0 z-40 bg-slate-950/60">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen relative">
+      {/* Ambient background — recolors per stage for a distinct, dynamic feel */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={stage}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.9, ease: 'easeInOut' }}
+            className="absolute inset-0"
+          >
+            <div className={`absolute -top-24 -left-16 w-[36rem] h-[36rem] rounded-full blur-3xl animate-float-slow ${accent.orbs[0]}`} />
+            <div className={`absolute top-[15%] -right-24 w-[30rem] h-[30rem] rounded-full blur-3xl animate-float ${accent.orbs[1]}`} />
+            <div className={`absolute bottom-[-10%] left-[25%] w-[28rem] h-[28rem] rounded-full blur-3xl animate-float-slow ${accent.orbs[2]}`} />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <header className="relative border-b border-white/5 backdrop-blur-md sticky top-0 z-40 bg-slate-950/60 overflow-hidden">
+        <div className="relative max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-lg shadow-lg shadow-indigo-500/30">
               🎓
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight">LearnPath</h1>
+              <h1 className="text-xl font-display font-bold tracking-tight bg-gradient-to-r from-white via-white to-slate-300 bg-clip-text text-transparent">LearnPath</h1>
               <p className="text-xs text-slate-400">Personalized learning from top universities</p>
             </div>
           </div>
@@ -145,13 +173,20 @@ export default function App() {
                 key={t.id}
                 disabled={!enabled}
                 onClick={() => enabled && setStage(t.id)}
-                className={`flex-1 min-w-[140px] px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2
-                  ${active ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg' : 'text-slate-300 hover:bg-white/5'}
+                className={`relative flex-1 min-w-[140px] px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2
+                  ${active ? 'text-white' : 'text-slate-300 hover:bg-white/5'}
                   ${!enabled ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{t.label}</span>
-                <span className="text-xs opacity-60">Step {i + 1}</span>
+                {active && (
+                  <motion.span
+                    layoutId="tab-pill"
+                    className={`absolute inset-0 rounded-xl bg-gradient-to-r ${accent.gradient} shadow-lg`}
+                    transition={{ type: 'spring', stiffness: 400, damping: 32 }}
+                  />
+                )}
+                <Icon className="relative z-10 w-4 h-4" />
+                <span className="relative z-10 hidden sm:inline">{t.label}</span>
+                <span className="relative z-10 text-xs opacity-60">Step {i + 1}</span>
               </button>
             )
           })}
