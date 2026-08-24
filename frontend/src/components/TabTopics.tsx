@@ -32,8 +32,9 @@ const PACES: { id: PacePref; label: string }[] = [
 ]
 
 const BUDGETS: { id: BudgetPref; label: string; hint: string }[] = [
-  { id: 'free_only',     label: 'Free only',              hint: "I don't want to pay for anything" },
-  { id: 'free_and_paid', label: 'Open to free + paid',    hint: 'Show me the best, paid or not' },
+  { id: 'strictly_free',  label: 'Strictly free',        hint: 'Only 100% free courses. No Coursera audit-only paid certs.' },
+  { id: 'free_and_audit', label: 'Free + audit-only',    hint: 'Include Coursera courses you can watch free (cert costs money).' },
+  { id: 'free_and_paid',  label: 'Open to paid',         hint: 'Show the best, paid or not.' },
 ]
 
 export default function TabTopics({
@@ -52,7 +53,7 @@ export default function TabTopics({
   const [goal, setGoal] = useState<GoalType | undefined>(undefined)
   const [formats, setFormats] = useState<FormatPref[]>([])
   const [pace, setPace] = useState<PacePref | undefined>(undefined)
-  const [budget, setBudget] = useState<BudgetPref>('free_only')
+  const [budget, setBudget] = useState<BudgetPref>('strictly_free')
 
   const [resuming, setResuming] = useState(false)
   const [resumeError, setResumeError] = useState<string | null>(null)

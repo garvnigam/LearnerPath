@@ -228,6 +228,13 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
 
     fmt_pref = ', '.join(req.topic_input.preferred_formats) or 'no preference'
     pace_pref = req.topic_input.pace or 'no preference'
+    budget_val = getattr(req.topic_input, "budget", "strictly_free")
+    budget_label = {
+        "strictly_free":  "strictly free courses only (no audit-required paid certs)",
+        "free_and_audit": "free courses and audit-free courses (Coursera-style: watch free, cert paid)",
+        "free_and_paid":  "open to free and paid courses",
+        "free_only":      "strictly free courses only",  # legacy
+    }.get(budget_val, "strictly free courses only")
 
     candidate_lines = []
     for c in candidates:
@@ -258,7 +265,7 @@ async def score(req: ScoreRequest, user: Principal = Depends(enforce_active_sess
 - Goal: {req.topic_input.goal or 'general'}
 - Preferred formats: {fmt_pref}
 - Preferred pace: {pace_pref}
-- Budget: {'free courses only' if getattr(req.topic_input, 'budget', 'free_only') == 'free_only' else 'open to free and paid courses'}
+- Budget: {budget_label}
 
 Quiz: {correct_count}/{len(req.questions)} correct overall.
 Per-subject provisional level:

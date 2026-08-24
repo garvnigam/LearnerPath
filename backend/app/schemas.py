@@ -6,7 +6,7 @@ FormatPref = Literal["video", "text", "hands-on"]
 PacePref = Literal["solo", "cohort", "paced"]
 
 
-BudgetPref = Literal["free_only", "free_and_paid"]
+BudgetPref = Literal["strictly_free", "free_and_audit", "free_and_paid"]
 
 
 class TopicInput(BaseModel):
@@ -17,7 +17,7 @@ class TopicInput(BaseModel):
     goal: Optional[GoalType] = None
     preferred_formats: list[FormatPref] = []
     pace: Optional[PacePref] = None
-    budget: BudgetPref = "free_only"
+    budget: BudgetPref = "strictly_free"
 
 
 class ChatMessage(BaseModel):

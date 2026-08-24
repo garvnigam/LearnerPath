@@ -88,11 +88,13 @@ Rules:
   - "exam_prep": favor resources with practice questions and structured syllabi.
 - Respect the learner's preferred formats (video/text/hands-on) and pace (solo/cohort/paced) when choosing
   and describing resources — prefer candidates whose "format" matches, when quality is comparable.
-- Respect the learner's budget:
-  - If the profile says "free courses only", pick ONLY resources whose price_type is "free" or "audit_free".
-    Reject any "paid" candidate silently and pick a free alternative.
-  - If the profile says "open to free and paid courses", you may include paid resources when they are
-    demonstrably better than the free alternatives for this learner.
+- Respect the learner's budget PRECISELY:
+  - "strictly free courses only" -> pick ONLY resources with price_type='free'. Reject any
+    'audit_free' (Coursera-style: watch free, cert paid) and any 'paid' candidate. Even a
+    great Coursera course must be skipped in favour of a free-outright alternative.
+  - "free courses and audit-free courses" -> pick 'free' or 'audit_free'. Reject 'paid'.
+    You may recommend Coursera audit-free courses since the learner accepts them.
+  - "open to free and paid courses" -> any price_type OK; prefer 'free' when comparable.
 - 4-8 total resources, ordered foundational -> advanced given each subject's level and the time budget.
 - Produce a week-by-week plan as a "weekly_plan" array covering the full duration_months at a reasonable
   granularity (one entry per week, or per block of weeks if duration is long — cap at 12 entries for very

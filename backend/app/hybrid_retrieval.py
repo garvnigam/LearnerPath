@@ -21,11 +21,20 @@ from .supabase_client import get_supabase
 
 
 # ------------- Source: internal DB (unified `courses` table via match_courses RPC) -------------
+BUDGET_TO_PRICE_TYPES = {
+    "strictly_free":  ["free"],
+    "free_and_audit": ["free", "audit_free"],
+    "free_and_paid":  ["free", "audit_free", "paid", "freemium"],
+    # legacy aliases (in case older sessions send these values)
+    "free_only":      ["free"],
+}
+
+
 async def fetch_db(
     subjects: list[str],
     focus: list[str],
     level: str,
-    budget: str = "free_only",
+    budget: str = "strictly_free",
     limit: int = 40,
     concepts: list[str] | None = None,
     max_hours: float | None = None,
@@ -34,8 +43,9 @@ async def fetch_db(
     """Fetch candidates from the unified `courses` table.
 
     budget:
-        "free_only"     -> only free / audit_free courses
-        "free_and_paid" -> both free and paid courses
+        "strictly_free"  -> only price_type = 'free' (no audit-required Coursera courses)
+        "free_and_audit" -> price_type in ('free', 'audit_free'); Coursera audit-free courses included
+        "free_and_paid"  -> all four price types
     """
     sb = get_supabase()
     if not sb:
@@ -44,11 +54,7 @@ async def fetch_db(
     if not topics:
         return []
 
-    price_types = (
-        ["free", "audit_free"]
-        if budget == "free_only"
-        else ["free", "audit_free", "paid", "freemium"]
-    )
+    price_types = BUDGET_TO_PRICE_TYPES.get(budget, ["free"])
     params = {
         "q_topics": topics,
         "q_concepts": concepts or [],
@@ -101,7 +107,7 @@ def _semantic_query_text(subject: str, focus: list[str], gap_concepts: list[str]
 async def fetch_semantic(
     query_embedding: list[float] | None,
     level: str,
-    budget: str = "free_only",
+    budget: str = "strictly_free",
     limit: int = 20,
     max_hours: float | None = None,
     language: str = "en",
@@ -118,11 +124,7 @@ async def fetch_semantic(
     if not sb:
         return []
 
-    price_types = (
-        ["free", "audit_free"]
-        if budget == "free_only"
-        else ["free", "audit_free", "paid", "freemium"]
-    )
+    price_types = BUDGET_TO_PRICE_TYPES.get(budget, ["free"])
     params = {
         "q_embedding": query_embedding,
         "level_in": _nearby_levels(level),
@@ -193,7 +195,7 @@ async def gather_candidates(
     subjects: list[str],
     focus: list[str],
     level: str,
-    budget: str = "free_only",
+    budget: str = "strictly_free",
     total_target: int = 40,
     allow_llm_fallback: bool = True,
     level_by_subject: dict[str, str] | None = None,
@@ -202,7 +204,7 @@ async def gather_candidates(
 ) -> list[dict]:
     """Run all sources in parallel per-subject, dedupe, and optionally fill with LLM extras.
 
-    budget: "free_only" or "free_and_paid".
+    budget: 'strictly_free' | 'free_and_audit' | 'free_and_paid'.
     gap_concepts_by_subject: concepts the learner MISSED per subject. Retrieval boosts
         courses whose `concepts` array overlaps these (SQL: `c.concepts && q_concepts`,
         with a +2 boost over topic match).

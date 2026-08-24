@@ -1,7 +1,7 @@
 export type GoalType = 'job' | 'certification' | 'project' | 'curiosity' | 'exam_prep'
 export type FormatPref = 'video' | 'text' | 'hands-on'
 export type PacePref = 'solo' | 'cohort' | 'paced'
-export type BudgetPref = 'free_only' | 'free_and_paid'
+export type BudgetPref = 'strictly_free' | 'free_and_audit' | 'free_and_paid'
 
 export type TopicInput = {
   user_id?: string | null
