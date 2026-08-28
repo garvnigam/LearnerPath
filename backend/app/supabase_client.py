@@ -1,3 +1,4 @@
+import uuid
 from supabase import create_client, Client
 from .config import settings
 
@@ -25,6 +26,12 @@ def save_session(user_id: str | None, session_id: str, payload: dict) -> None:
     sb = get_supabase()
     if not sb:
         return
+    # Skip if user_id is not a valid UUID (e.g., "anonymous")
+    if user_id:
+        try:
+            uuid.UUID(user_id)
+        except ValueError:
+            user_id = None
     try:
         sb.table("learning_sessions").upsert({
             "session_id": session_id,

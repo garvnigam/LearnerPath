@@ -101,7 +101,7 @@ class Course(BaseModel):
     duration: Optional[str] = None
     image: Optional[str] = None
     topics: list[str] = []
-    format: Optional[Literal["course", "playlist", "lectures"]] = "course"
+    format: Optional[Literal["course", "playlist", "lectures", "specialization", "module", "track", "nanodegree"]] = "course"
     price_type: Optional[Literal["free", "audit_free", "paid", "freemium"]] = "free"
     price_amount: Optional[float] = None
     price_currency: Optional[str] = "USD"
