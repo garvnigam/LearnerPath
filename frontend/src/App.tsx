@@ -71,7 +71,7 @@ export default function App() {
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="glass max-w-md w-full p-8 text-center space-y-4">
           <h1 className="text-2xl font-display font-semibold">Session ended</h1>
-          <p className="text-slate-300 text-sm">Your 2-minute session has expired. Signing you out…</p>
+          <p className="text-slate-300 text-sm">Your session has expired. Signing you out…</p>
         </div>
       </div>
     )
@@ -114,7 +114,7 @@ export default function App() {
                     ? 'bg-rose-500/15 border-rose-400/40 text-rose-300'
                     : 'bg-white/5 border-white/10 text-slate-300'
                 }`}
-                title="MVP session — you'll be signed out after this timer"
+                title="Session time remaining"
               >
                 <Clock className="w-3 h-3" />
                 {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}
