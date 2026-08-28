@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { useMsal, useIsAuthenticated } from '@azure/msal-react'
 import type { TopicInput, ChatMessage, RecommendationResponse, MCQ, SavedPlanResponse } from './lib/types'
 import { entraConfigured } from './lib/authConfig'
@@ -13,13 +13,6 @@ import LoginPage from './components/LoginPage'
 import { GraduationCap, MessageSquare, ListChecks, Sparkles, Clock } from 'lucide-react'
 
 type Stage = 'topics' | 'chat' | 'assessment' | 'results'
-
-const STAGE_ACCENT: Record<Stage, { gradient: string; orbs: [string, string, string] }> = {
-  topics: { gradient: 'from-amber-500 via-orange-500 to-rose-500', orbs: ['bg-amber-500/25', 'bg-orange-500/20', 'bg-rose-500/15'] },
-  chat: { gradient: 'from-emerald-500 via-teal-500 to-cyan-500', orbs: ['bg-emerald-500/25', 'bg-teal-500/20', 'bg-cyan-500/15'] },
-  assessment: { gradient: 'from-amber-500 via-orange-500 to-rose-500', orbs: ['bg-amber-500/25', 'bg-orange-500/20', 'bg-rose-500/15'] },
-  results: { gradient: 'from-emerald-500 via-teal-500 to-cyan-500', orbs: ['bg-emerald-500/25', 'bg-teal-500/20', 'bg-cyan-500/15'] },
-}
 
 export default function App() {
   const { instance, accounts } = useMsal()
@@ -57,11 +50,8 @@ export default function App() {
       <>
         <LoginPage />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-6">
-          <div className="glass max-w-md w-full p-8 text-center space-y-4 border border-rose-400/30">
-            <div className="w-12 h-12 mx-auto rounded-full bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-2xl">
-              🚫
-            </div>
-            <h1 className="text-2xl font-bold">Login not allowed</h1>
+          <div className="glass max-w-md w-full p-8 text-center space-y-4 border border-white/15">
+            <h1 className="text-2xl font-display font-semibold">Login not allowed</h1>
             <p className="text-slate-300 text-sm leading-relaxed">{session.reason}</p>
             <p className="text-xs text-slate-500">
               This is an MVP running on a minimum budget. Only one login is allowed per account.
@@ -82,7 +72,7 @@ export default function App() {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="glass max-w-md w-full p-8 text-center space-y-4">
-          <h1 className="text-2xl font-bold">Session ended</h1>
+          <h1 className="text-2xl font-display font-semibold">Session ended</h1>
           <p className="text-slate-300 text-sm">Your 2-minute session has expired. Signing you out…</p>
         </div>
       </div>
@@ -100,37 +90,22 @@ export default function App() {
     { id: 'results', label: 'Your path', icon: Sparkles },
   ]
 
-  const accent = STAGE_ACCENT[stage]
-
   return (
     <div className="min-h-screen relative">
-      {/* Ambient background — recolors per stage for a distinct, dynamic feel */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={stage}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.9, ease: 'easeInOut' }}
-            className="absolute inset-0"
-          >
-            <div className={`absolute -top-24 -left-16 w-[36rem] h-[36rem] rounded-full blur-3xl animate-float-slow ${accent.orbs[0]}`} />
-            <div className={`absolute top-[15%] -right-24 w-[30rem] h-[30rem] rounded-full blur-3xl animate-float ${accent.orbs[1]}`} />
-            <div className={`absolute bottom-[-10%] left-[25%] w-[28rem] h-[28rem] rounded-full blur-3xl animate-float-slow ${accent.orbs[2]}`} />
-          </motion.div>
-        </AnimatePresence>
+        <div className="absolute -top-24 -left-16 w-[36rem] h-[36rem] rounded-full blur-3xl bg-amber-400/[0.05]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[28rem] h-[28rem] rounded-full blur-3xl bg-white/[0.03]" />
       </div>
 
-      <header className="relative border-b border-white/5 backdrop-blur-md sticky top-0 z-40 bg-slate-950/60 overflow-hidden">
+      <header className="relative border-b border-white/10 backdrop-blur-md sticky top-0 z-40 bg-slate-950/70 overflow-hidden">
         <div className="relative max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-lg shadow-lg shadow-indigo-500/30">
-              🎓
+            <div className="w-10 h-10 rounded-md border border-amber-300/30 bg-amber-400/10 flex items-center justify-center flex-shrink-0">
+              <GraduationCap className="w-5 h-5 text-amber-300" />
             </div>
             <div>
-              <h1 className="text-xl font-display font-bold tracking-tight bg-gradient-to-r from-white via-white to-slate-300 bg-clip-text text-transparent">LearnPath</h1>
-              <p className="text-xs text-slate-400">Personalized learning from top universities</p>
+              <h1 className="text-xl font-display font-semibold tracking-tight text-slate-100">LearnPath</h1>
+              <p className="label-caps">Personalized learning from top universities</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -148,7 +123,7 @@ export default function App() {
               </span>
             )}
             {isUnlimited && (
-              <span className="hidden sm:inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300">
+              <span className="hidden sm:inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-white/5 border border-white/15 text-slate-300">
                 unlimited
               </span>
             )}
@@ -173,14 +148,14 @@ export default function App() {
                 key={t.id}
                 disabled={!enabled}
                 onClick={() => enabled && setStage(t.id)}
-                className={`relative flex-1 min-w-[140px] px-4 py-3 rounded-xl font-medium text-sm transition flex items-center justify-center gap-2
-                  ${active ? 'text-white' : 'text-slate-300 hover:bg-white/5'}
+                className={`relative flex-1 min-w-[140px] px-4 py-3 rounded-md font-sans font-medium text-sm transition flex items-center justify-center gap-2
+                  ${active ? 'text-slate-950' : 'text-slate-300 hover:bg-white/5'}
                   ${!enabled ? 'opacity-40 cursor-not-allowed' : ''}`}
               >
                 {active && (
                   <motion.span
                     layoutId="tab-pill"
-                    className={`absolute inset-0 rounded-xl bg-gradient-to-r ${accent.gradient} shadow-lg`}
+                    className="absolute inset-0 rounded-md bg-amber-400/90"
                     transition={{ type: 'spring', stiffness: 400, damping: 32 }}
                   />
                 )}

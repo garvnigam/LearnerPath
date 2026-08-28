@@ -4,14 +4,12 @@ import { Rocket, History, Loader2, Briefcase, Award, Wrench, Compass, Graduation
 import { motion, AnimatePresence } from 'framer-motion'
 import { apiGet } from '../lib/api'
 
-const SUBJECT_EMOJI: Record<string, string> = {
-  'Computer Science': '💻', 'Machine Learning': '🤖', 'Deep Learning': '🧠', 'Data Science': '📊',
-  'Mathematics': '➗', 'Physics': '⚛️', 'Statistics': '📈', 'Web Development': '🌐',
-  'Cybersecurity': '🛡️', 'Robotics': '🦾', 'Economics': '💹', 'Business': '💼',
-  'Music': '🎵', 'Arts': '🎨', 'History': '📜', 'Philosophy': '🧭', 'Psychology': '🧩', 'Biology': '🧬',
-}
-
-const SUGGESTED = Object.keys(SUBJECT_EMOJI)
+const SUGGESTED = [
+  'Computer Science', 'Machine Learning', 'Deep Learning', 'Data Science',
+  'Mathematics', 'Physics', 'Statistics', 'Web Development',
+  'Cybersecurity', 'Robotics', 'Economics', 'Business',
+  'Music', 'Arts', 'History', 'Philosophy', 'Psychology', 'Biology',
+]
 
 const GOALS: { id: GoalType; label: string; icon: any }[] = [
   { id: 'job', label: 'Get a job', icon: Briefcase },
@@ -122,17 +120,11 @@ export default function TabTopics({
       )}
 
       <motion.div variants={item} className="glass p-8 relative overflow-hidden">
-        <div className="pointer-events-none absolute -top-16 -right-16 w-64 h-64 rounded-full bg-gradient-to-br from-amber-500/20 to-rose-500/10 blur-3xl" />
         <div className="relative flex items-center gap-3 mb-2">
-          <motion.div
-            initial={{ scale: 0.6, opacity: 0, rotate: -15 }}
-            animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 220, damping: 16 }}
-            className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 flex items-center justify-center text-xl shadow-lg shadow-orange-500/30 flex-shrink-0"
-          >
-            🚀
-          </motion.div>
-          <h2 className="text-3xl font-display font-bold bg-gradient-to-r from-amber-400 via-orange-400 to-rose-400 bg-clip-text text-transparent">
+          <div className="w-11 h-11 rounded-md border border-amber-300/30 bg-amber-400/10 flex items-center justify-center flex-shrink-0">
+            <Rocket className="w-5 h-5 text-amber-300" />
+          </div>
+          <h2 className="text-3xl font-display font-semibold text-slate-100">
             What do you want to learn?
           </h2>
         </div>
@@ -145,7 +137,7 @@ export default function TabTopics({
               onClick={() => toggle(s)}
               className={`chip ${selected.includes(s) ? 'chip-active' : ''}`}
             >
-              <span className="mr-1">{SUBJECT_EMOJI[s]}</span>{s}
+              {s}
             </button>
           ))}
         </div>
@@ -177,9 +169,9 @@ export default function TabTopics({
                     initial={{ opacity: 0, scale: 0.7 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.7 }}
-                    className="inline-flex items-center gap-1.5 text-xs pl-2.5 pr-1.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-rose-500/20 border border-amber-400/30 text-amber-200"
+                    className="inline-flex items-center gap-1.5 text-xs pl-2.5 pr-1.5 py-1 rounded-full bg-amber-400/10 border border-amber-300/30 text-amber-200"
                   >
-                    {SUBJECT_EMOJI[s] ?? '📌'} {s}
+                    {s}
                     <button onClick={() => toggle(s)} className="hover:text-white transition p-0.5">
                       <X className="w-3 h-3" />
                     </button>
@@ -194,7 +186,7 @@ export default function TabTopics({
       <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-            <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-300">
+            <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
               <CalendarRange className="w-4 h-4" />
             </span>
             How many months to prepare?
@@ -204,7 +196,7 @@ export default function TabTopics({
               type="range" min={1} max={24}
               value={months}
               onChange={(e) => setMonths(+e.target.value)}
-              className="flex-1 accent-amber-500"
+              className="flex-1 accent-amber-400"
             />
             <span className="text-2xl font-bold w-16 text-right">{months}mo</span>
           </div>
@@ -219,7 +211,7 @@ export default function TabTopics({
 
         <div className="glass p-6">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-            <span className="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-400/30 flex items-center justify-center text-orange-300">
+            <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
               <Clock className="w-4 h-4" />
             </span>
             Hours per day you can study?
@@ -229,7 +221,7 @@ export default function TabTopics({
               type="range" min={0.5} max={8} step={0.5}
               value={hours}
               onChange={(e) => setHours(+e.target.value)}
-              className="flex-1 accent-orange-500"
+              className="flex-1 accent-amber-400"
             />
             <span className="text-2xl font-bold w-16 text-right">{hours}h</span>
           </div>
@@ -245,7 +237,7 @@ export default function TabTopics({
 
       <motion.div variants={item} className="glass p-6">
         <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-          <span className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-400/30 flex items-center justify-center text-rose-300">
+          <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
             <Rocket className="w-4 h-4" />
           </span>
           What's your goal?
@@ -270,7 +262,7 @@ export default function TabTopics({
       <motion.div variants={item} className="grid md:grid-cols-2 gap-4">
         <div className="glass p-6">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-            <span className="w-7 h-7 rounded-lg bg-amber-500/15 border border-amber-400/30 flex items-center justify-center text-amber-300">
+            <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
               <Video className="w-4 h-4" />
             </span>
             Prefer video, text, or hands-on? <span className="text-slate-500 font-normal">(pick any)</span>
@@ -294,7 +286,7 @@ export default function TabTopics({
 
         <div className="glass p-6">
           <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-3">
-            <span className="w-7 h-7 rounded-lg bg-orange-500/15 border border-orange-400/30 flex items-center justify-center text-orange-300">
+            <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
               <Users className="w-4 h-4" />
             </span>
             Solo, cohort, or paced with deadlines?
@@ -319,7 +311,7 @@ export default function TabTopics({
 
       <motion.div variants={item} className="glass p-6">
         <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-2">
-          <span className="w-7 h-7 rounded-lg bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center text-emerald-300">
+          <span className="w-7 h-7 rounded-md bg-amber-400/10 border border-amber-300/30 flex items-center justify-center text-amber-300">
             <Wallet className="w-4 h-4" />
           </span>
           What's your budget?
@@ -335,7 +327,7 @@ export default function TabTopics({
               onClick={() => setBudget(b.id)}
             >
               <span className="font-semibold">{b.label}</span>
-              <span className="text-xs text-slate-400 font-normal">{b.hint}</span>
+              <span className={`text-xs font-normal ${budget === b.id ? 'text-slate-800' : 'text-slate-400'}`}>{b.hint}</span>
             </button>
           ))}
         </div>

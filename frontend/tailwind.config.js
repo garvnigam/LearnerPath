@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Space Grotesk', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Source Serif 4', 'Georgia', 'Cambria', 'Times New Roman', 'serif'],
+        display: ['EB Garamond', 'Georgia', 'Times New Roman', 'serif'],
       },
       animation: {
         'gradient': 'gradient 8s ease infinite',

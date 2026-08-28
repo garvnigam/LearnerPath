@@ -90,13 +90,12 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass p-6 min-h-[560px] flex flex-col relative overflow-hidden">
-      <div className="pointer-events-none absolute -top-20 -left-20 w-72 h-72 rounded-full bg-gradient-to-br from-emerald-500/15 to-teal-500/5 blur-3xl" />
       <div className="relative flex items-center gap-3 mb-4 pb-4 border-b border-white/10">
-        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 flex-shrink-0">
-          <Sparkles className="w-4 h-4 text-white" />
+        <div className="w-9 h-9 rounded-md border border-amber-300/30 bg-amber-400/10 flex items-center justify-center flex-shrink-0">
+          <Sparkles className="w-4 h-4 text-amber-300" />
         </div>
         <h2 className="text-lg font-display font-semibold">Let's narrow it down</h2>
-        <span className="ml-auto hidden sm:inline-flex text-xs text-slate-400 bg-white/5 border border-white/10 rounded-full px-3 py-1">
+        <span className="label-caps ml-auto hidden sm:inline-flex bg-white/5 border border-white/10 rounded-full px-3 py-1 normal-case">
           {topicInput.subjects.join(' • ')} · {topicInput.duration_months}mo · {topicInput.hours_per_day}h/day
         </span>
       </div>
@@ -105,7 +104,6 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
         {isFirstLoad && (
           <LoadingScene
             title="Starting your conversation"
-            accent="from-emerald-500 to-teal-600"
             icons={[Sparkles, MessageCircleMore, Bot]}
             messages={[
               `Looking at ${topicInput.subjects.join(', ')}…`,
@@ -123,19 +121,19 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
               className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {m.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-md border border-white/10 bg-white/5 flex items-center justify-center flex-shrink-0">
                   <Bot className="w-4 h-4" />
                 </div>
               )}
-              <div className={`max-w-[75%] px-4 py-3 rounded-2xl text-sm leading-relaxed
+              <div className={`max-w-[75%] px-4 py-3 rounded-lg text-sm leading-relaxed
                 ${m.role === 'user'
-                  ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-br-sm'
+                  ? 'bg-amber-400/90 text-slate-950 rounded-br-sm'
                   : 'bg-white/5 border border-white/10 rounded-bl-sm'}`}
               >
                 {m.content}
               </div>
               {m.role === 'user' && (
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                <div className="w-8 h-8 rounded-md bg-white/10 flex items-center justify-center flex-shrink-0">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -144,21 +142,14 @@ export default function TabChat({ userId, sessionId, topicInput, messages, setMe
         </AnimatePresence>
         {loading && !isFirstLoad && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex gap-3 items-center">
-            <div className="relative w-8 h-8 flex-shrink-0">
-              <motion.span
-                className="absolute inset-0 rounded-lg bg-emerald-500/40 blur-md"
-                animate={{ opacity: [0.4, 0.9, 0.4] }}
-                transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-              />
-              <div className="relative w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                <Bot className="w-4 h-4" />
-              </div>
+            <div className="relative w-8 h-8 flex-shrink-0 rounded-md border border-white/10 bg-white/5 flex items-center justify-center">
+              <Bot className="w-4 h-4" />
             </div>
-            <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-2xl rounded-bl-sm flex items-center gap-3">
+            <div className="bg-white/5 border border-white/10 px-4 py-3 rounded-lg rounded-bl-sm flex items-center gap-3">
               <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 rounded-full bg-slate-400 animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
               <AnimatePresence mode="wait">
                 <motion.span

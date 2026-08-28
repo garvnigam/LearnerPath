@@ -5,11 +5,10 @@ import type { LucideIcon } from 'lucide-react'
 type Props = {
   icons: LucideIcon[]
   messages: string[]
-  accent: string
   title?: string
 }
 
-export default function LoadingScene({ icons, messages, accent, title }: Props) {
+export default function LoadingScene({ icons, messages, title }: Props) {
   const [i, setI] = useState(0)
 
   useEffect(() => {
@@ -25,13 +24,11 @@ export default function LoadingScene({ icons, messages, accent, title }: Props) 
       animate={{ opacity: 1, y: 0 }}
       className="glass p-16 flex flex-col items-center justify-center gap-6 text-center overflow-hidden relative"
     >
-      <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${accent} opacity-[0.06]`} />
-
       {title && <h2 className="relative text-lg font-display font-semibold text-slate-200">{title}</h2>}
 
       <div className="relative w-28 h-28 flex items-center justify-center">
         <motion.span
-          className={`absolute inset-0 rounded-full bg-gradient-to-br ${accent} opacity-25 blur-2xl`}
+          className="absolute inset-0 rounded-full bg-amber-400/10 blur-2xl"
           animate={{ scale: [1, 1.35, 1] }}
           transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
         />
@@ -52,9 +49,9 @@ export default function LoadingScene({ icons, messages, accent, title }: Props) 
             animate={{ opacity: 1, scale: 1, rotate: 0 }}
             exit={{ opacity: 0, scale: 0.4, rotate: 25 }}
             transition={{ duration: 0.35, ease: 'backOut' }}
-            className={`relative w-14 h-14 rounded-2xl bg-gradient-to-br ${accent} flex items-center justify-center shadow-lg`}
+            className="relative w-14 h-14 rounded-md border border-amber-300/30 bg-amber-400/10 flex items-center justify-center"
           >
-            <Icon className="w-7 h-7 text-white" />
+            <Icon className="w-7 h-7 text-amber-300" />
           </motion.div>
         </AnimatePresence>
       </div>
@@ -76,7 +73,7 @@ export default function LoadingScene({ icons, messages, accent, title }: Props) 
 
       <div className="relative w-56 h-1.5 rounded-full bg-white/10 overflow-hidden">
         <motion.div
-          className={`h-full w-1/3 rounded-full bg-gradient-to-r ${accent} motion-reduce:hidden`}
+          className="h-full w-1/3 rounded-full bg-amber-400/80 motion-reduce:hidden"
           animate={{ x: ['-100%', '250%'] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
         />
