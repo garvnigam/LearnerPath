@@ -24,7 +24,6 @@ type Props = {
   messages: ChatMessage[]
   setMessages: (m: ChatMessage[]) => void
   onReady: (focus: string[]) => void
-  onQuestionsReady: (qs: any[]) => void
 }
 
 export default function TabChat({ userId, sessionId, topicInput, messages, setMessages, onReady }: Props) {

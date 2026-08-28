@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useMsal, useIsAuthenticated } from '@azure/msal-react'
-import type { TopicInput, ChatMessage, RecommendationResponse, MCQ, SavedPlanResponse } from './lib/types'
+import type { TopicInput, ChatMessage, RecommendationResponse, SavedPlanResponse } from './lib/types'
 import { entraConfigured } from './lib/authConfig'
 import { useSessionQuota } from './lib/useSessionQuota'
 import TabTopics from './components/TabTopics'
 import TabChat from './components/TabChat'
-import TabAssessment from './components/TabAssessment'
+import TabAdaptiveAssessment from './components/TabAdaptiveAssessment'
 import TabResults from './components/TabResults'
 import AuthGate from './components/AuthGate'
 import LoginPage from './components/LoginPage'
@@ -26,8 +26,6 @@ export default function App() {
   const [topicInput, setTopicInput] = useState<TopicInput | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [focusAreas, setFocusAreas] = useState<string[]>([])
-  const [questions, setQuestions] = useState<MCQ[]>([])
-  const [answers, setAnswers] = useState<Record<number, 'A' | 'B' | 'C' | 'D'>>({})
   const [recommendation, setRecommendation] = useState<RecommendationResponse | null>(null)
 
   useEffect(() => {
@@ -141,7 +139,7 @@ export default function App() {
             const enabled =
               i === 0 ||
               (i === 1 && !!topicInput) ||
-              (i === 2 && questions.length > 0) ||
+              (i === 2 && !!topicInput) ||
               (i === 3 && !!recommendation)
             return (
               <button
@@ -195,24 +193,19 @@ export default function App() {
               setFocusAreas(focus)
               setStage('assessment')
             }}
-            onQuestionsReady={(qs) => setQuestions(qs)}
           />
         )}
 
         {stage === 'assessment' && topicInput && (
-          <TabAssessment
+          <TabAdaptiveAssessment
             sessionId={sessionId}
             topicInput={topicInput}
             focusAreas={focusAreas}
-            questions={questions}
-            setQuestions={setQuestions}
-            answers={answers}
-            setAnswers={setAnswers}
+            userId={userId}
             onSubmit={(rec) => {
               setRecommendation(rec)
               setStage('results')
             }}
-            userId={userId}
           />
         )}
 
@@ -224,8 +217,6 @@ export default function App() {
               setTopicInput(null)
               setMessages([])
               setFocusAreas([])
-              setQuestions([])
-              setAnswers({})
               setRecommendation(null)
               setStage('topics')
             }}

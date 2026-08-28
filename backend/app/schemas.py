@@ -63,9 +63,24 @@ class AssessmentRequest(BaseModel):
     prior_answers: dict[int, Literal["A", "B", "C", "D"]] = {}
 
 
+class AdaptiveAssessmentRequest(BaseModel):
+    session_id: str
+    topic_input: TopicInput
+    focus_areas: list[str]
+    answered_questions: list[MCQ] = []
+    answers: dict[int, Literal["A", "B", "C", "D"]] = {}
+
+
 class AssessmentResponse(BaseModel):
     questions: list[MCQ]
     round: int = 1
+
+
+class AdaptiveAssessmentResponse(BaseModel):
+    question: Optional[MCQ] = None
+    is_complete: bool = False
+    questions_per_subject: dict[str, int] = {}  # track count per subject
+    message: Optional[str] = None
 
 
 class ScoreRequest(BaseModel):

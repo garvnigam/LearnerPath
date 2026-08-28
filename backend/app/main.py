@@ -12,6 +12,7 @@ from .config import settings
 from .schemas import (
     ChatRequest, ChatResponse, ChatMessage,
     AssessmentRequest, AssessmentResponse, MCQ,
+    AdaptiveAssessmentRequest, AdaptiveAssessmentResponse,
     ScoreRequest, RecommendationResponse, Course, WeekPlan, SavedPlanResponse,
 )
 from .azure_client import chat_json
@@ -241,6 +242,167 @@ Each question's "subject" field MUST be one of the listed subjects verbatim.
         "questions": [q.model_dump() for q in (req.prior_questions + questions)],
     })
     return AssessmentResponse(questions=questions, round=round_no)
+
+
+@app.post("/api/assessment/adaptive", response_model=AdaptiveAssessmentResponse)
+def adaptive_assessment(req: AdaptiveAssessmentRequest, user: Principal = Depends(enforce_active_session)):
+    """
+    Adaptive CAT-style assessment: generates one question at a time based on previous performance.
+    
+    Logic:
+    - Min 5 questions per subject, max 10 per subject
+    - If user gets easy wrong → give another easy
+    - If user gets easy right → level up to intermediate
+    - If user gets intermediate right → level up to advanced
+    - Stop per subject when: 10 questions reached OR level is confidently determined (3+ consistent answers)
+    """
+    if not settings.azure_openai_key:
+        raise HTTPException(500, "Azure OpenAI not configured")
+    
+    subjects = req.topic_input.subjects
+    n_subjects = len(subjects)
+    
+    # Analyze performance per subject
+    performance_by_subject: dict[str, dict] = {}
+    for subj in subjects:
+        subj_qs = [q for q in req.answered_questions if q.subject == subj]
+        performance_by_subject[subj] = {
+            "count": len(subj_qs),
+            "correct": 0,
+            "wrong": 0,
+            "last_difficulty": None,
+            "last_correct": None,
+            "difficulty_history": [],
+            "result_history": [],
+        }
+        
+        for q in subj_qs:
+            is_correct = req.answers.get(q.id) == q.correct
+            performance_by_subject[subj]["correct" if is_correct else "wrong"] += 1
+            performance_by_subject[subj]["last_difficulty"] = q.difficulty
+            performance_by_subject[subj]["last_correct"] = is_correct
+            performance_by_subject[subj]["difficulty_history"].append(q.difficulty)
+            performance_by_subject[subj]["result_history"].append(is_correct)
+    
+    # Determine which subject needs next question
+    next_subject = None
+    next_difficulty = "beginner"
+    
+    for subj in subjects:
+        perf = performance_by_subject[subj]
+        count = perf["count"]
+        
+        # Skip if this subject reached 10 questions
+        if count >= 10:
+            continue
+            
+        # Check if we have enough confidence to stop (but need min 5)
+        if count >= 5:
+            recent_results = perf["result_history"][-3:]
+            # If last 3 are all correct at same or increasing difficulty, we can stop
+            if len(recent_results) >= 3 and all(recent_results[-3:]):
+                recent_diffs = perf["difficulty_history"][-3:]
+                if len(set(recent_diffs)) == 1 or all(
+                    d in ["intermediate", "advanced"] for d in recent_diffs
+                ):
+                    continue  # Confident, skip this subject
+        
+        # If we haven't reached min 5 for this subject, prioritize it
+        if count < 5:
+            next_subject = subj
+            break
+        # Otherwise, pick the first subject that hasn't reached 10
+        if next_subject is None:
+            next_subject = subj
+    
+    # If all subjects are done, return completion
+    if next_subject is None:
+        total_questions = sum(p["count"] for p in performance_by_subject.values())
+        return AdaptiveAssessmentResponse(
+            is_complete=True,
+            questions_per_subject={s: performance_by_subject[s]["count"] for s in subjects},
+            message=f"Assessment complete! Answered {total_questions} questions across {n_subjects} subjects."
+        )
+    
+    # Determine difficulty for next question based on performance
+    perf = performance_by_subject[next_subject]
+    if perf["count"] == 0:
+        next_difficulty = "beginner"
+    else:
+        last_diff = perf["last_difficulty"]
+        last_correct = perf["last_correct"]
+        
+        # Adaptive logic
+        if last_diff == "beginner":
+            if last_correct:
+                next_difficulty = "intermediate"  # Level up
+            else:
+                next_difficulty = "beginner"  # Stay at beginner
+        elif last_diff == "intermediate":
+            if last_correct:
+                next_difficulty = "advanced"  # Level up
+            else:
+                # Check if they got previous beginner right
+                beginner_results = [
+                    perf["result_history"][i] 
+                    for i, d in enumerate(perf["difficulty_history"]) 
+                    if d == "beginner"
+                ]
+                if beginner_results and all(beginner_results):
+                    next_difficulty = "intermediate"  # Stay at intermediate
+                else:
+                    next_difficulty = "beginner"  # Drop down
+        elif last_diff == "advanced":
+            if last_correct:
+                next_difficulty = "advanced"  # Stay at advanced
+            else:
+                next_difficulty = "intermediate"  # Drop down
+    
+    # Build context for LLM
+    answered_concepts = set()
+    for q in req.answered_questions:
+        answered_concepts.update(q.concepts or [])
+    
+    user_msg = f"""Generate exactly 1 MCQ for:
+- Subject (must match exactly): {next_subject}
+- Difficulty: {next_difficulty}
+- Focus areas: {', '.join(req.focus_areas) or 'general'}
+- Goal: {req.topic_input.goal or 'general learning'}
+
+Already asked concepts (avoid these): {', '.join(answered_concepts) if answered_concepts else 'none yet'}
+
+The question's "subject" field MUST be "{next_subject}" verbatim.
+The difficulty MUST be "{next_difficulty}".
+
+Performance so far for {next_subject}: {perf["correct"]} correct, {perf["wrong"]} wrong out of {perf["count"]} questions.
+"""
+    
+    try:
+        data = chat_json(ASSESSMENT_SYSTEM, [{"role": "user", "content": user_msg}], temperature=0.5)
+    except Exception as e:
+        raise HTTPException(500, f"Azure OpenAI error: {e}")
+    
+    qs = data.get("questions", [])
+    if len(qs) < 1:
+        raise HTTPException(500, "Assessment generation returned no questions")
+    
+    question_data = {**qs[0], "id": len(req.answered_questions) + 1}
+    question = MCQ(**question_data)
+    
+    # Save session state
+    save_session(user.subject or req.session_id, req.session_id, {
+        "stage": "adaptive_assessment",
+        "topic_input": req.topic_input.model_dump(),
+        "focus_areas": req.focus_areas,
+        "answered_questions": [q.model_dump() for q in req.answered_questions] + [question.model_dump()],
+        "answers": req.answers,
+    })
+    
+    return AdaptiveAssessmentResponse(
+        question=question,
+        is_complete=False,
+        questions_per_subject={s: performance_by_subject[s]["count"] for s in subjects},
+    )
 
 
 @app.post("/api/score", response_model=RecommendationResponse)

@@ -221,7 +221,7 @@ export default function TabAssessment({
       <div className="flex justify-end sticky bottom-4">
         {round === 1 ? (
           <button className="btn-primary flex items-center gap-2" disabled={!canAdvance} onClick={advanceToRound2}>
-            Next 5 questions <ArrowRight className="w-4 h-4" />
+            Next {roundTwoQuestions.length} question{roundTwoQuestions.length !== 1 ? 's' : ''} <ArrowRight className="w-4 h-4" />
           </button>
         ) : (
           <button className="btn-primary" disabled={!canSubmit} onClick={submit}>
