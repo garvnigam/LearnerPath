@@ -31,7 +31,27 @@ export default function TabResults({ recommendation: r, topicInput, onRestart }:
   const [expandedWeek, setExpandedWeek] = useState<number | null>(null)
 
   const findCourseForWeek = (weekPlan: typeof r.weekly_plan[0]): Course | undefined => {
-    return r.courses.find(c => c.title === weekPlan.primary_resource)
+    // Try exact match first
+    let matched = r.courses.find(c => c.title === weekPlan.primary_resource)
+    // Try case-insensitive match
+    if (!matched) {
+      matched = r.courses.find(c => c.title.toLowerCase() === weekPlan.primary_resource.toLowerCase())
+    }
+    // Try partial match (course title contains primary_resource or vice versa)
+    if (!matched) {
+      matched = r.courses.find(c => 
+        c.title.toLowerCase().includes(weekPlan.primary_resource.toLowerCase()) ||
+        weekPlan.primary_resource.toLowerCase().includes(c.title.toLowerCase())
+      )
+    }
+    // Try matching by index if week corresponds to course order
+    if (!matched) {
+      const weekIndex = r.weekly_plan.findIndex(wp => wp.week === weekPlan.week)
+      if (weekIndex >= 0 && weekIndex < r.courses.length) {
+        matched = r.courses[weekIndex]
+      }
+    }
+    return matched
   }
 
   const CourseCard = ({ course, index }: { course: Course; index?: number }) => (
@@ -285,7 +305,7 @@ export default function TabResults({ recommendation: r, topicInput, onRestart }:
                       {/* Week Card (3D) */}
                       <motion.div
                         whileHover={{ y: -2, rotateX: 1 }}
-                        onClick={() => setExpandedWeek(isExpanded ? null : w.week)}
+                        onClick={() => setExpandedWeek(prev => prev === w.week ? null : w.week)}
                         className="relative cursor-pointer group"
                         style={{ transformStyle: 'preserve-3d' }}
                       >
@@ -341,7 +361,7 @@ export default function TabResults({ recommendation: r, topicInput, onRestart }:
 
                       {/* Expanded Course Card */}
                       <AnimatePresence>
-                        {isExpanded && matchedCourse && (
+                        {isExpanded && (
                           <motion.div
                             initial={{ opacity: 0, height: 0, y: -20 }}
                             animate={{ opacity: 1, height: 'auto', y: 0 }}
@@ -349,7 +369,15 @@ export default function TabResults({ recommendation: r, topicInput, onRestart }:
                             transition={{ duration: 0.3 }}
                             className="mt-3 ml-16"
                           >
-                            <CourseCard course={matchedCourse} />
+                            {matchedCourse ? (
+                              <CourseCard course={matchedCourse} />
+                            ) : (
+                              <div className="glass p-5 border border-amber-300/30 rounded-lg">
+                                <p className="text-amber-300 font-medium mb-2">Course for Week {w.week}</p>
+                                <p className="text-slate-300 mb-3">{w.primary_resource}</p>
+                                <p className="text-sm text-slate-400">Full course details not available. Resource: {w.primary_resource}</p>
+                              </div>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
