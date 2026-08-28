@@ -106,16 +106,6 @@ def start_session(user: Principal, request: Request) -> StartResult:
     ip = _client_ip(request)
     ip_exempt = ip in _ip_allowlist()
 
-    # NEW: Reject ALL IPs not in allowlist (no first login allowed)
-    if not ip_exempt:
-        return StartResult(
-            allowed=False,
-            reason="Access denied: Your IP is not authorized to access this application.",
-            is_unlimited=False,
-            ttl_seconds=settings.session_ttl_seconds,
-            session_expires_at=0.0,
-        )
-
     already_subject = subject in _LOGIN_LEDGER
     ip_owner = _IP_LEDGER.get(ip)
 
@@ -161,10 +151,8 @@ def enforce_active_session(request: Request, user: Principal = Depends(require_u
     _, email = _identify(user)
     if _is_unlimited(email):
         return user
-
-    # NEW: Reject ALL IPs not in allowlist on every request
-    if _client_ip(request) not in _ip_allowlist():
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Access denied: Your IP is not authorized to access this application.")
+    if _client_ip(request) in _ip_allowlist():
+        return user
 
     subject = user.subject or email or "anonymous"
     started = _SESSION_STARTS.get(subject)
