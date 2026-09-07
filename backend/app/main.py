@@ -14,9 +14,16 @@ from .schemas import (
     AssessmentRequest, AssessmentResponse, MCQ,
     AdaptiveAssessmentRequest, AdaptiveAssessmentResponse,
     ScoreRequest, RecommendationResponse, Course, WeekPlan, SavedPlanResponse,
+    WeekTestRequest, WeekTestResponse,
+    WeekTestSubmitRequest, WeekTestSubmitResponse,
+    RefresherModule, RefresherResource,
+    WEEK_TEST_TOTAL, WEEK_TEST_PASSING,
 )
 from .azure_client import chat_json
-from .prompts import CHAT_SYSTEM, ASSESSMENT_SYSTEM, RECOMMEND_SYSTEM
+from .prompts import (
+    CHAT_SYSTEM, ASSESSMENT_SYSTEM, RECOMMEND_SYSTEM,
+    WEEK_TEST_SYSTEM, REFRESHER_SYSTEM,
+)
 from .catalog import CURATED, filter_catalog
 from .hybrid_retrieval import gather_candidates
 from .supabase_client import save_session, get_latest_recommendation
@@ -556,6 +563,21 @@ Candidate courses (prefer these, use exact URLs). You may also add up to 3 world
         except Exception:
             continue
 
+    # A weekly plan can reference a valid catalog course whose URL the model
+    # omitted from picked_course_urls. Include it so every named resource has
+    # a complete course card in the learner's path.
+    candidate_by_title = {
+        str(course.get("title", "")).strip().casefold(): course
+        for course in candidates
+        if course.get("title") and course.get("url")
+    }
+    for plan in weekly_plan:
+        for resource_title in (plan.primary_resource, plan.secondary_resource):
+            candidate = candidate_by_title.get((resource_title or "").strip().casefold())
+            if candidate and candidate["url"] not in seen_urls:
+                picked_courses.append(Course(**candidate))
+                seen_urls.add(candidate["url"])
+
     level_by_subject = {
         subj: data.get("level_by_subject", {}).get(subj, provisional_by_subject.get(subj, provisional))
         for subj in req.topic_input.subjects
@@ -586,6 +608,231 @@ Candidate courses (prefer these, use exact URLs). You may also add up to 3 world
         "courses": [c.model_dump() for c in resp.courses],
     })
     return resp
+
+
+@app.post("/api/week/test", response_model=WeekTestResponse)
+def week_test(req: WeekTestRequest, user: Principal = Depends(enforce_active_session)):
+    """
+    Generate the 10-mark checkpoint test that gates one week of the plan.
+
+    The learner marks a week's course complete -> this test is generated. 8/10 is the pass mark.
+    On a retest (attempt > 1) the caller passes `weak_concepts` from the failed attempt, and the
+    test is weighted onto exactly those concepts.
+    """
+    if not settings.azure_openai_key:
+        raise HTTPException(500, "Azure OpenAI not configured")
+
+    subjects = req.subjects or req.topic_input.subjects
+    subjects_display = ", ".join(subjects) or "the learner's subject"
+    resources_display = "\n".join(f"  - {r}" for r in req.resources) or "  (not specified)"
+
+    if req.attempt > 1 and req.weak_concepts:
+        attempt_note = (
+            f"This is RETEST attempt #{req.attempt}. The learner previously scored below "
+            f"{WEEK_TEST_PASSING}/{WEEK_TEST_TOTAL} and has just finished a refresher on these\n"
+            f"WEAK CONCEPTS (weight at least 6 of the 10 questions here, asked from a new angle):\n"
+            + "\n".join(f"  - {c}" for c in req.weak_concepts)
+        )
+    else:
+        attempt_note = "This is the learner's FIRST attempt at this week's checkpoint test."
+
+    covered = ", ".join(req.covered_concepts[:40]) or "none yet"
+
+    user_msg = f"""Generate the {WEEK_TEST_TOTAL}-question checkpoint test for WEEK {req.week}.
+
+- Learner's subjects: {subjects_display}
+- Learner's level: {req.level}
+- Goal: {req.topic_input.goal or 'general learning'}
+- Week {req.week} focus: {req.week_focus or 'the resources listed below'}
+- Week {req.week} resource(s) the learner just completed:
+{resources_display}
+
+{attempt_note}
+
+ALREADY-ASKED concepts (don't reuse the same question wording): {covered}
+
+Each question's "subject" field must be one of: {subjects_display}.
+"""
+
+    try:
+        data = chat_json(WEEK_TEST_SYSTEM, [{"role": "user", "content": user_msg}], temperature=0.5)
+    except Exception as e:
+        raise HTTPException(500, f"Azure OpenAI error: {e}")
+
+    raw = data.get("questions", []) or []
+    if len(raw) < WEEK_TEST_TOTAL:
+        raise HTTPException(
+            500,
+            f"Week test generation returned only {len(raw)} of {WEEK_TEST_TOTAL} questions",
+        )
+
+    questions: list[MCQ] = []
+    for i, q in enumerate(raw[:WEEK_TEST_TOTAL]):
+        q = {**q, "id": i + 1}
+        if not q.get("subject") and subjects:
+            q["subject"] = subjects[0]
+        try:
+            questions.append(MCQ(**q))
+        except Exception:
+            continue
+
+    if len(questions) < WEEK_TEST_TOTAL:
+        raise HTTPException(500, "Week test generation produced malformed questions")
+
+    save_session(user.subject or req.user_id, req.session_id, {
+        "stage": "week_test",
+        "topic_input": req.topic_input.model_dump(),
+        "week": req.week,
+        "attempt": req.attempt,
+        "week_focus": req.week_focus,
+        "questions": [q.model_dump() for q in questions],
+    })
+
+    return WeekTestResponse(
+        week=req.week,
+        attempt=req.attempt,
+        total=WEEK_TEST_TOTAL,
+        passing_score=WEEK_TEST_PASSING,
+        questions=questions,
+    )
+
+
+@app.post("/api/week/submit", response_model=WeekTestSubmitResponse)
+def week_test_submit(req: WeekTestSubmitRequest, user: Principal = Depends(enforce_active_session)):
+    """
+    Score a week's checkpoint test. Passing (>= 8/10) clears the week.
+
+    Below the threshold, the agent inspects *which* questions were missed, derives the specific
+    weak concepts, and returns a refresher module targeted at only those concepts — to be done
+    inside the same week before retaking the test.
+    """
+    score = 0
+    missed_concepts: list[str] = []
+    correct_concepts: list[str] = []
+    wrong_lines: list[str] = []
+    seen_missed: set[str] = set()
+    seen_correct: set[str] = set()
+
+    for q in req.questions:
+        picked = req.answers.get(q.id)
+        concepts = [c.strip().lower() for c in (q.concepts or []) if c and c.strip()]
+        if picked == q.correct:
+            score += 1
+            for c in concepts:
+                if c not in seen_correct:
+                    seen_correct.add(c)
+                    correct_concepts.append(c)
+        else:
+            picked_text = next((o.text for o in q.options if o.key == picked), "(no answer)")
+            correct_text = next((o.text for o in q.options if o.key == q.correct), "")
+            wrong_lines.append(
+                f"- Q{q.id} [{q.subject}, {q.difficulty}] {q.question}\n"
+                f"    learner chose: {picked or '-'} \"{picked_text}\"\n"
+                f"    correct answer: {q.correct} \"{correct_text}\"\n"
+                f"    why: {q.explanation}\n"
+                f"    concepts: {', '.join(concepts) or '(untagged)'}"
+            )
+            for c in concepts:
+                if c not in seen_missed:
+                    seen_missed.add(c)
+                    missed_concepts.append(c)
+
+    total = len(req.questions) or WEEK_TEST_TOTAL
+    passed = score >= WEEK_TEST_PASSING
+
+    # Concepts they got right elsewhere shouldn't be re-taught unless they also missed them.
+    correct_concepts = [c for c in correct_concepts if c not in seen_missed]
+
+    refresher: RefresherModule | None = None
+    if not passed:
+        fmt_pref = ", ".join(req.topic_input.preferred_formats) or "no preference"
+        prompt = f"""The learner failed the Week {req.week} checkpoint test.
+
+Result: {score}/{total} (pass mark is {WEEK_TEST_PASSING}/{total}). Attempt #{req.attempt}.
+
+- Subjects: {', '.join(req.topic_input.subjects)}
+- Goal: {req.topic_input.goal or 'general learning'}
+- Preferred formats (lead with these): {fmt_pref}
+- Hours available per day: {req.topic_input.hours_per_day}
+- Week {req.week} focus: {req.week_focus or '(not specified)'}
+- Week {req.week} resource(s) already attempted: {', '.join(req.resources) or '(not specified)'}
+
+Concepts they answered CORRECTLY (do NOT re-teach these): {', '.join(correct_concepts) or '(none)'}
+
+Questions they got WRONG — diagnose from these:
+{chr(10).join(wrong_lines) or '(none recorded)'}
+"""
+        try:
+            data = chat_json(REFRESHER_SYSTEM, [{"role": "user", "content": prompt}], temperature=0.4)
+        except Exception as e:
+            log.warning("Refresher generation failed for week %s: %s", req.week, e)
+            data = {}
+
+        resources: list[RefresherResource] = []
+        for r in data.get("resources", []) or []:
+            try:
+                if not r.get("title"):
+                    continue
+                url = r.get("url")
+                if isinstance(url, str) and not url.lower().startswith(("http://", "https://")):
+                    url = None
+                resources.append(RefresherResource(
+                    title=r["title"],
+                    kind=r.get("kind") if r.get("kind") in ("text", "video", "practice") else "text",
+                    url=url,
+                    provider=r.get("provider"),
+                    why=r.get("why", ""),
+                ))
+            except Exception:
+                continue
+
+        weak = [c for c in (data.get("weak_concepts") or []) if isinstance(c, str) and c.strip()]
+        weak_concepts = [c.strip().lower() for c in weak] or missed_concepts
+
+        est = data.get("est_minutes", 60)
+        try:
+            est = max(15, min(180, int(est)))
+        except Exception:
+            est = 60
+
+        refresher = RefresherModule(
+            week=req.week,
+            title=data.get("title") or f"Week {req.week} refresher",
+            weak_concepts=weak_concepts,
+            summary=data.get("summary") or (
+                f"You scored {score}/{total}, below the {WEEK_TEST_PASSING}/{total} pass mark. "
+                "This refresher targets the concepts behind your wrong answers."
+            ),
+            notes=data.get("notes") or "",
+            est_minutes=est,
+            resources=resources,
+        )
+    else:
+        weak_concepts = missed_concepts
+
+    save_session(user.subject or req.user_id, req.session_id, {
+        "stage": "week_test_result",
+        "topic_input": req.topic_input.model_dump(),
+        "week": req.week,
+        "attempt": req.attempt,
+        "score": score,
+        "total": total,
+        "passed": passed,
+        "weak_concepts": weak_concepts,
+        "refresher": refresher.model_dump() if refresher else None,
+    })
+
+    return WeekTestSubmitResponse(
+        week=req.week,
+        attempt=req.attempt,
+        score=score,
+        total=total,
+        passing_score=WEEK_TEST_PASSING,
+        passed=passed,
+        correct_concepts=correct_concepts,
+        weak_concepts=weak_concepts,
+        refresher=refresher,
+    )
 
 
 @app.get("/api/plan/{user_id}", response_model=SavedPlanResponse)

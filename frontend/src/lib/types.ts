@@ -69,6 +69,81 @@ export type RecommendationResponse = {
   courses: Course[]
 }
 
+export const WEEK_TEST_TOTAL = 10
+export const WEEK_TEST_PASSING = 8
+
+export type WeekTestRequest = {
+  user_id?: string | null
+  session_id: string
+  topic_input: TopicInput
+  week: number
+  week_focus: string
+  resources: string[]
+  subjects?: string[]
+  level: 'beginner' | 'intermediate' | 'advanced'
+  attempt: number
+  weak_concepts?: string[]
+  covered_concepts?: string[]
+}
+
+export type WeekTestResponse = {
+  week: number
+  attempt: number
+  total: number
+  passing_score: number
+  questions: MCQ[]
+}
+
+export type RefresherResource = {
+  title: string
+  kind: 'text' | 'video' | 'practice'
+  url?: string | null
+  provider?: string | null
+  why: string
+}
+
+export type RefresherModule = {
+  week: number
+  title: string
+  weak_concepts: string[]
+  summary: string
+  notes: string
+  est_minutes: number
+  resources: RefresherResource[]
+}
+
+export type WeekTestSubmitResponse = {
+  week: number
+  attempt: number
+  score: number
+  total: number
+  passing_score: number
+  passed: boolean
+  correct_concepts: string[]
+  weak_concepts: string[]
+  refresher?: RefresherModule | null
+}
+
+/** Where a week sits in the completion → test → refresher → retest loop. */
+export type WeekStatus =
+  | 'locked'
+  | 'in_progress'
+  | 'testing'
+  | 'refresher'
+  | 'passed'
+  | 'skipped'
+
+export type WeekProgress = {
+  status: WeekStatus
+  attempts: number
+  bestScore: number | null
+  lastScore: number | null
+  weakConcepts: string[]
+  coveredConcepts: string[]
+  refresher: RefresherModule | null
+  refresherDone: boolean
+}
+
 export type SavedPlanResponse = {
   topic_input: TopicInput
   recommendation: RecommendationResponse
