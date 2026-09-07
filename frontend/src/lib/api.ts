@@ -1,7 +1,14 @@
 import { apiTokenRequest, entraConfigured, msalInstance } from './authConfig'
 import { InteractionRequiredAuthError } from '@azure/msal-browser'
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://localhost:8000' : '')
+
+function apiUrl(path: string): string {
+  if (!API) {
+    throw new Error('Application API is not configured. Set VITE_API_URL to the deployed backend URL.')
+  }
+  return `${API.replace(/\/$/, '')}${path}`
+}
 
 async function getAccessToken(): Promise<string | null> {
   // DEV: login disabled temporarily — skip MSAL token acquisition entirely so a stale/
@@ -35,7 +42,7 @@ export async function apiPost<T>(path: string, body: unknown): Promise<T> {
   const token = await getAccessToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API}${path}`, {
+  const res = await fetch(apiUrl(path), {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -52,7 +59,7 @@ export async function apiGet<T>(path: string): Promise<T> {
   const token = await getAccessToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`${API}${path}`, { method: 'GET', headers })
+  const res = await fetch(apiUrl(path), { method: 'GET', headers })
   if (!res.ok) {
     const t = await res.text()
     throw new Error(`${res.status}: ${t}`)
