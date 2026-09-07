@@ -116,6 +116,76 @@ class WeekPlan(BaseModel):
     checkpoint: str
 
 
+WEEK_TEST_TOTAL = 10
+WEEK_TEST_PASSING = 8
+
+
+class WeekTestRequest(BaseModel):
+    """Ask for the 10-mark checkpoint test that gates one week of the plan."""
+    user_id: Optional[str] = None
+    session_id: str
+    topic_input: TopicInput
+    week: int = Field(..., ge=1)
+    week_focus: str = ""
+    resources: list[str] = []          # titles of the week's course(s)
+    subjects: list[str] = []           # subjects this week covers; defaults to all
+    level: Literal["beginner", "intermediate", "advanced"] = "beginner"
+    attempt: int = Field(1, ge=1)
+    weak_concepts: list[str] = []      # from the previous failed attempt — retest these
+    covered_concepts: list[str] = []   # already-asked concepts, avoid repeats
+
+
+class WeekTestResponse(BaseModel):
+    week: int
+    attempt: int
+    total: int = WEEK_TEST_TOTAL
+    passing_score: int = WEEK_TEST_PASSING
+    questions: list[MCQ]
+
+
+class WeekTestSubmitRequest(BaseModel):
+    """Score a week test and, on failure, build the targeted refresher for that same week."""
+    user_id: Optional[str] = None
+    session_id: str
+    topic_input: TopicInput
+    week: int = Field(..., ge=1)
+    week_focus: str = ""
+    resources: list[str] = []
+    attempt: int = Field(1, ge=1)
+    questions: list[MCQ]
+    answers: dict[int, Literal["A", "B", "C", "D"]] = {}
+
+
+class RefresherResource(BaseModel):
+    title: str
+    kind: Literal["text", "video", "practice"] = "text"
+    url: Optional[str] = None
+    provider: Optional[str] = None
+    why: str = ""                      # what gap this closes
+
+
+class RefresherModule(BaseModel):
+    week: int
+    title: str
+    weak_concepts: list[str] = []
+    summary: str = ""
+    notes: str = ""                    # textual refresher the learner can read inline
+    est_minutes: int = 60
+    resources: list[RefresherResource] = []
+
+
+class WeekTestSubmitResponse(BaseModel):
+    week: int
+    attempt: int
+    score: int
+    total: int = WEEK_TEST_TOTAL
+    passing_score: int = WEEK_TEST_PASSING
+    passed: bool
+    correct_concepts: list[str] = []
+    weak_concepts: list[str] = []
+    refresher: Optional[RefresherModule] = None
+
+
 class RecommendationResponse(BaseModel):
     level: Literal["beginner", "intermediate", "advanced"]
     level_by_subject: dict[str, Literal["beginner", "intermediate", "advanced"]] = {}

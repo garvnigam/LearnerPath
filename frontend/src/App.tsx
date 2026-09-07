@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useMsal, useIsAuthenticated } from '@azure/msal-react'
+import { useMsal } from '@azure/msal-react'
 import type { TopicInput, ChatMessage, RecommendationResponse, SavedPlanResponse } from './lib/types'
-import { entraConfigured } from './lib/authConfig'
 import { useSessionQuota } from './lib/useSessionQuota'
 import TabTopics from './components/TabTopics'
 import TabChat from './components/TabChat'
@@ -16,10 +15,10 @@ type Stage = 'topics' | 'chat' | 'assessment' | 'results'
 
 export default function App() {
   const { instance, accounts } = useMsal()
-  const isAuthenticated = useIsAuthenticated()
   const session = useSessionQuota()
 
   const [userId, setUserId] = useState<string | null>(null)
+  const [localUser, setLocalUser] = useState<string | null>(() => localStorage.getItem('realty-shiksha:user'))
   const [sessionId] = useState<string>(() => crypto.randomUUID())
 
   const [stage, setStage] = useState<Stage>('topics')
@@ -37,16 +36,21 @@ export default function App() {
     }
   }, [accounts])
 
-  // DEV: Entra login gate disabled temporarily — hindering local development.
-  // Uncomment to re-enable login enforcement.
-  // if (entraConfigured && !isAuthenticated) {
-  //   return <LoginPage />
-  // }
+  if (!localUser) {
+    return (
+      <LoginPage
+        onLogin={username => {
+          localStorage.setItem('realty-shiksha:user', username)
+          setLocalUser(username)
+        }}
+      />
+    )
+  }
 
   if (session.status === 'blocked') {
     return (
       <>
-        <LoginPage />
+        <LoginPage onLogin={setLocalUser} />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-6">
           <div className="glass max-w-md w-full p-8 text-center space-y-4 border border-white/15">
             <h1 className="text-2xl font-display font-semibold">Login not allowed</h1>
@@ -98,12 +102,14 @@ export default function App() {
       <header className="relative border-b border-white/10 backdrop-blur-md sticky top-0 z-40 bg-slate-950/70 overflow-hidden">
         <div className="relative max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-md border border-amber-300/30 bg-amber-400/10 flex items-center justify-center flex-shrink-0">
-              <GraduationCap className="w-5 h-5 text-amber-300" />
-            </div>
+            <img
+              src="/realty-shiksha-logo.jpeg"
+              alt="Realty Shiksha"
+              className="w-11 h-11 object-contain rounded-full border border-amber-300/30 bg-white"
+            />
             <div>
-              <h1 className="text-xl font-display font-semibold tracking-tight text-slate-100">LearnPath</h1>
-              <p className="label-caps">Personalized learning from top universities</p>
+              <h1 className="text-xl font-display font-semibold tracking-tight text-slate-100">Realty Shiksha</h1>
+              <p className="label-caps">Knowledge that builds futures</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -125,7 +131,18 @@ export default function App() {
                 unlimited
               </span>
             )}
-            <AuthGate />
+            <AuthGate
+              username={localUser}
+              onSignOut={() => {
+                localStorage.removeItem('realty-shiksha:user')
+                setLocalUser(null)
+                setTopicInput(null)
+                setMessages([])
+                setFocusAreas([])
+                setRecommendation(null)
+                setStage('topics')
+              }}
+            />
           </div>
         </div>
       </header>
@@ -213,6 +230,8 @@ export default function App() {
           <TabResults
             recommendation={recommendation}
             topicInput={topicInput}
+            sessionId={sessionId}
+            userId={userId}
             onRestart={() => {
               setTopicInput(null)
               setMessages([])
@@ -225,7 +244,7 @@ export default function App() {
       </main>
 
       <footer className="text-center text-xs text-slate-500 py-8">
-        Built with Azure OpenAI • Courses from MIT, Stanford, Harvard, IITs, top YouTube playlists & more
+        Realty Shiksha • Knowledge that builds futures
       </footer>
     </div>
   )
