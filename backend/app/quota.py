@@ -145,7 +145,9 @@ def start_session(user: Principal, request: Request) -> StartResult:
 
 def enforce_active_session(request: Request, user: Principal = Depends(require_user)) -> Principal:
     """Reject requests once the per-session TTL has elapsed (unless unlimited)."""
-    if settings.entra_auth_disabled:
+    # A quota can only be enforced per user when auth supplied an identity. The
+    # local-login mode uses an anonymous principal and must not share one TTL.
+    if settings.entra_auth_disabled or not (user.subject and user.subject != "anonymous"):
         return user
 
     _, email = _identify(user)
