@@ -60,9 +60,6 @@ def health():
         "ok": True,
         "azure_configured": bool(settings.azure_openai_key),
         "supabase_configured": bool(settings.supabase_url and settings.supabase_service_role),
-        "auth_configured": bool(
-            settings.entra_tenant_id and settings.entra_tenant_subdomain and settings.entra_api_client_id
-        ),
     }
 
 
