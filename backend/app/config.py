@@ -13,19 +13,6 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
-    # Microsoft Entra External ID (customer tenant) — used to validate access tokens
-    entra_tenant_subdomain: str = ""  # e.g. "contoso" for contoso.ciamlogin.com
-    entra_tenant_id: str = ""         # tenant GUID (found in Entra portal overview)
-    entra_api_client_id: str = ""     # client ID of the backend API app registration (audience)
-    entra_required_scope: str = ""    # optional scp value to require, e.g. "LearnPath.Access"
-    entra_auth_disabled: bool = False  # dev escape hatch; when True, all requests are accepted anonymously
-
-    # MVP quotas
-    session_ttl_seconds: int = 86400                   # auto-logout after this many seconds (24 hours)
-    login_allowlist_emails: str = "gk3360836@gmail.com"  # comma-separated, may login multiple times
-    login_allowlist_ips: str = "127.0.0.1,::1"         # comma-separated IPs exempted from IP block
-    single_login_enforced: bool = True                 # if True, non-allowlisted users can only log in once
-
     # Optional: embedding deployment for semantic retrieval
     embeddings_model_endpoint: str = ""
     embeddings_model_key: str = ""
