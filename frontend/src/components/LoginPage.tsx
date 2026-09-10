@@ -40,7 +40,7 @@ export default function LoginPage({ onLogin }: Props) {
         />
         <div className="text-center mb-7">
           <h1 className="text-3xl font-display font-semibold">Realty Shiksha</h1>
-          <p className="text-sm text-slate-400 mt-2">Knowledge that builds futures.</p>
+          <p className="text-sm text-slate-400 mt-2">Knowledge that builds future.</p>
         </div>
 
         <label className="block text-sm font-medium text-slate-300 mb-2" htmlFor="username">
