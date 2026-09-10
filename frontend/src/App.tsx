@@ -109,7 +109,7 @@ export default function App() {
             />
             <div>
               <h1 className="text-xl font-display font-semibold tracking-tight text-slate-100">Realty Shiksha</h1>
-              <p className="label-caps">Knowledge that builds futures</p>
+              <p className="label-caps">Knowledge that builds future</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -244,7 +244,7 @@ export default function App() {
       </main>
 
       <footer className="text-center text-xs text-slate-500 py-8">
-        Realty Shiksha • Knowledge that builds futures
+        Realty Shiksha • Knowledge that builds future
       </footer>
     </div>
   )
